@@ -1046,7 +1046,7 @@ function viewCursos(){
   const rows = state.cursos.map(c=>`
     <div class="doc-card">
       <div class="doc-title">${esc(c.nome)}</div>
-      <div class="doc-meta">Sigla usada no nome do arquivo: <b>${esc(c.sigla || abreviar(c.nome))}</b></div>
+      <div class="doc-meta">${c.modalidade ? `Modalidade: <b>${esc(c.modalidade)}</b> · ` : ''}Sigla usada no nome do arquivo: <b>${esc(c.sigla || abreviar(c.nome))}</b></div>
       <div class="doc-actions">
         <button class="btn small secondary" data-action="edit-curso" data-id="${c.id}">Editar</button>
         <button class="btn small danger" data-action="del-curso" data-id="${c.id}">Excluir</button>
@@ -1062,6 +1062,11 @@ function viewCursos(){
       <div class="grid2">
         <div class="field"><label>Nome do curso</label><input id="c_nome" type="text" placeholder="Ex.: Técnico em Administração" value="${esc(editing?editing.nome:'')}"></div>
         <div class="field"><label>Sigla / abreviação (opcional)</label><input id="c_sigla" type="text" placeholder="Ex.: ADMEM" value="${esc(editing?editing.sigla||'':'')}"><div class="hint">Se deixar em branco, o sistema gera uma automaticamente para nomear os PDFs.</div></div>
+        <div class="field"><label>Modalidade</label><select id="c_modalidade">
+          <option value="" ${!editing||!editing.modalidade?'selected':''}>Ambas / não se aplica</option>
+          <option value="Pós-Médio" ${editing&&editing.modalidade==='Pós-Médio'?'selected':''}>Pós-Médio</option>
+          <option value="EMIEP" ${editing&&editing.modalidade==='EMIEP'?'selected':''}>EMIEP</option>
+        </select><div class="hint">Define em quais Planejamentos este curso aparece para escolha (por modalidade).</div></div>
       </div>
       ${editing ? `
         <button class="btn" data-action="save-curso-edit">Salvar alterações</button>
@@ -1181,7 +1186,10 @@ function viewPlanejForm(){
   const isNew = editingPlanejId==='new';
   const pl = isNew ? {} : getPlanej(editingPlanejId);
   if(!isNew) formBlocos = (pl.blocos && !formBlocos._loaded) ? loadBlocos(pl.blocos) : formBlocos;
-  const cursoOpts = state.cursos.map(c=>`<option value="${esc(c.nome)}" ${pl.curso===c.nome?'selected':''}>${esc(c.nome)}</option>`).join('');
+  const modalidadeAtual = pl.modalidade || 'Pós-Médio';
+  const cursoOpts = state.cursos
+    .filter(c => !c.modalidade || c.modalidade === modalidadeAtual)
+    .map(c=>`<option value="${esc(c.nome)}" ${pl.curso===c.nome?'selected':''}>${esc(c.nome)}</option>`).join('');
   const plTurmasSel = lines((pl.turmas||'').replace(/,/g,'\n'));
   const turmasField = state.turmas.length ? `
     <div class="field" style="grid-column:1/-1;"><label>Turma(s)</label>
@@ -1415,6 +1423,21 @@ function attachHandlers(){
       render();
     });
   });
+
+  // Planejamento: filtra a lista de Cursos conforme a Modalidade escolhida, sem perder o resto do formulário.
+  const fModalidade = document.getElementById('f_modalidade');
+  const fCurso = document.getElementById('f_curso');
+  if(fModalidade && fCurso){
+    fModalidade.addEventListener('change', ()=>{
+      const modalidadeSel = fModalidade.value;
+      const cursoAtual = fCurso.value;
+      const opts = state.cursos.filter(c => !c.modalidade || c.modalidade === modalidadeSel);
+      const aindaValido = opts.some(c => c.nome === cursoAtual);
+      fCurso.innerHTML = '<option value="">— selecione —</option>' +
+        opts.map(c => `<option value="${esc(c.nome)}" ${c.nome===cursoAtual?'selected':''}>${esc(c.nome)}</option>`).join('');
+      if(!aindaValido) toast('A lista de cursos foi atualizada para a modalidade escolhida.');
+    });
+  }
   const buscaEl = document.getElementById('pf_busca');
   if(buscaEl){
     let buscaTimer;
@@ -1484,7 +1507,7 @@ function attachHandlers(){
 
   on('add-curso', async ()=>{
     const nome = val('c_nome'); if(!nome){ toast('Informe o nome do curso.', 'warn'); return; }
-    state.cursos.push({ id: uid(), nome, sigla: val('c_sigla') });
+    state.cursos.push({ id: uid(), nome, sigla: val('c_sigla'), modalidade: val('c_modalidade') || '' });
     await save('cursos'); render();
   });
   on('edit-curso', (el)=>{ editingCursoId = el.dataset.id; render(); });
@@ -1492,7 +1515,7 @@ function attachHandlers(){
   on('save-curso-edit', async ()=>{
     const nome = val('c_nome'); if(!nome){ toast('Informe o nome do curso.', 'warn'); return; }
     const c = state.cursos.find(c=>c.id===editingCursoId);
-    if(c){ c.nome = nome; c.sigla = val('c_sigla'); await save('cursos'); }
+    if(c){ c.nome = nome; c.sigla = val('c_sigla'); c.modalidade = val('c_modalidade') || ''; await save('cursos'); }
     editingCursoId = null; render();
     toast('Curso atualizado.');
   });
@@ -1970,7 +1993,37 @@ async function baixarPDF(){
 
     for(let i=0;i<blocks.length;i++){
       const block = blocks[i];
-      const canvas = await capture(block.el);
+      let target = block.el;
+      const restoreFns = [];
+      if(block.table){
+        // Capturamos sempre a <table> inteira (nunca um <thead>/<tr> solto), escondendo
+        // temporariamente as partes que não fazem parte deste bloco. Isso evita problemas
+        // conhecidos de renderização com células mescladas (rowspan/colspan) quando
+        // capturadas isoladamente.
+        const table = block.table;
+        const thead = table.tHead;
+        const tbody = table.tBodies[0];
+        if(block.isHeaderGroup){
+          if(tbody){ const prev = tbody.style.display; tbody.style.display='none'; restoreFns.push(()=> tbody.style.display=prev); }
+        } else {
+          if(thead){ const prev = thead.style.display; thead.style.display='none'; restoreFns.push(()=> thead.style.display=prev); }
+          if(tbody){
+            Array.from(tbody.rows).forEach(r=>{
+              if(r!==block.el){ const prev = r.style.display; r.style.display='none'; restoreFns.push(()=> r.style.display=prev); }
+            });
+          }
+        }
+        target = table;
+      }
+      let canvas;
+      try{
+        canvas = await capture(target);
+      }catch(rowErr){
+        console.error('Falha ao capturar um trecho do documento — pulando este bloco:', rowErr);
+        restoreFns.forEach(fn=>fn());
+        continue;
+      }
+      restoreFns.forEach(fn=>fn());
       if(block.isHeaderGroup) headerCanvasCache.set(block.table, canvas);
       const h = canvas.height * contentWidth / canvas.width;
       const wouldOverflow = (cursorY + h > pageHeight - marginBottom) && cursorY > marginTop;
@@ -2002,7 +2055,7 @@ async function baixarPDF(){
     if(openBtn){ openBtn.style.display='inline-block'; openBtn.onclick = ()=> window.open(dataUri, '_blank'); }
   }catch(err){
     console.error('Erro ao gerar PDF', err);
-    toast('Não foi possível gerar o PDF agora. Tente novamente.', 'warn');
+    toast('Não foi possível gerar o PDF agora (' + (err&&err.message ? err.message.slice(0,60) : 'erro desconhecido') + '). Tente novamente.', 'warn');
   }finally{
     btn.textContent = originalLabel; btn.disabled = false;
   }
