@@ -592,7 +592,7 @@ function setView(v){
   if(v!=='turmas') editingTurmaId=null;
   if(v!=='disciplinas') editingDisciplinaId=null;
   if(v==='pesquisa') pesquisaAba='responder';
-  if(v==='suporte'){ suporteAba='lista'; suporteChamadoAtualId=null; }
+  if(v==='suporte'){ suporteAba='lista'; suporteChamadoAtualId=null; suporteFiltroStatus='Todos'; }
   document.querySelectorAll('.nav-item[data-view]').forEach(n=>n.classList.toggle('active', n.dataset.view===v));
   const cadastroViews = ['perfil','escolas','cursos','turmas','disciplinas'];
   const submenu = document.getElementById('submenuCadastros');
@@ -912,6 +912,9 @@ function pesquisaBaixarCsv(respostas){
 /* ============================= NOVIDADES E ATUALIZAÇÕES ============================= */
 // Lista do mais recente para o mais antigo — o primeiro item é sempre a versão vigente.
 const VERSOES = [
+  { versao:'2.0', data:'15/08/2026', itens:[
+    'Central de Suporte: administrador agora pode filtrar os chamados por status (Todos, Abertos, Em Análise, Encerrados), facilitando o acompanhamento do que ainda precisa de atenção.'
+  ]},
   { versao:'1.9', data:'15/08/2026', itens:[
     'Nova área "Documentos" no menu, com Checklist de Desenvolvimento, Manual do Sistema e Manual do Professor disponíveis direto no sistema (visualização e download em PDF).',
     'Administrador visualiza os três documentos; Professor(a) tem acesso ao Manual do Professor.'
@@ -977,6 +980,15 @@ function viewNovidades(){
 
 /* ============================= CENTRAL DE SUPORTE ============================= */
 let suporteAba = 'lista'; // 'lista' | 'novo' | 'detalhe'
+let suporteFiltroStatus = 'Todos'; // 'Todos' | 'Abertos' | 'Em análise' | 'Encerrados'
+const SUPORTE_FILTROS = ['Todos','Abertos','Em análise','Encerrados'];
+function suporteChamadoPassaFiltro(c){
+  if(suporteFiltroStatus==='Todos') return true;
+  if(suporteFiltroStatus==='Abertos') return c.status==='Aberto';
+  if(suporteFiltroStatus==='Em análise') return c.status==='Em análise';
+  if(suporteFiltroStatus==='Encerrados') return c.status==='Resolvido' || c.status==='Encerrado';
+  return true;
+}
 let suporteChamadoAtualId = null;
 let suporteCacheChamados = [];
 let suporteSelecionados = new Set(); // ids marcados para o relatório de encaminhamento (só admin)
@@ -1047,12 +1059,20 @@ function renderSuporteListaHtml(){
   if(suporteCacheChamados.length===0){
     return cabecalho + `<div class="empty">Nenhum chamado ${isAdmin?'registrado ainda':'aberto por você ainda'}.</div>`;
   }
+  const barraFiltro = isAdmin ? `
+    <div class="card" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+      <div class="hint" style="margin-right:4px;">Filtrar:</div>
+      ${SUPORTE_FILTROS.map(f=>`<button class="btn ${f===suporteFiltroStatus?'':'secondary'} small" data-action="suporte-filtro" data-filtro="${esc(f)}">${esc(f)}</button>`).join('')}
+    </div>` : '';
   const barraRelatorio = isAdmin ? `
     <div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
       <div class="hint">Marque os chamados abaixo para reunir num relatório de encaminhamento ao desenvolvimento.</div>
       <button class="btn secondary small" data-action="suporte-gerar-relatorio">📄 Gerar relatório dos selecionados (${suporteSelecionados.size})</button>
     </div>` : '';
-  const ordenados = [...suporteCacheChamados].sort((a,b)=> (b.criadoEm||0)-(a.criadoEm||0));
+  const ordenados = [...suporteCacheChamados].filter(suporteChamadoPassaFiltro).sort((a,b)=> (b.criadoEm||0)-(a.criadoEm||0));
+  if(isAdmin && ordenados.length===0){
+    return cabecalho + barraFiltro + `<div class="empty">Nenhum chamado com o filtro "${esc(suporteFiltroStatus)}".</div>`;
+  }
   const rows = ordenados.map(c=>`
     <div class="doc-card" style="position:relative;${isAdmin?'padding-left:38px;':''}">
       ${isAdmin ? `<input type="checkbox" data-action="suporte-selecionar" data-id="${c.id}" ${suporteSelecionados.has(c.id)?'checked':''}
@@ -1063,7 +1083,7 @@ function renderSuporteListaHtml(){
         <div style="margin-top:6px;">${suporteBadge(c.status)}</div>
       </div>
     </div>`).join('');
-  return cabecalho + barraRelatorio + `<div class="doc-grid">${rows}</div>`;
+  return cabecalho + barraFiltro + barraRelatorio + `<div class="doc-grid">${rows}</div>`;
 }
 
 function renderSuporteNovoForm(){
@@ -2197,6 +2217,12 @@ function attachHandlers(){
   on('suporte-cancelar', ()=>{ suporteAba='lista'; render(); carregarSuporte(); });
   on('suporte-voltar', ()=>{ suporteAba='lista'; suporteChamadoAtualId=null; render(); carregarSuporte(); });
   on('suporte-abrir', async (el)=>{ suporteAba='detalhe'; suporteChamadoAtualId=el.dataset.id; render(); await carregarSuporte(); });
+
+  on('suporte-filtro', (el)=>{
+    suporteFiltroStatus = el.dataset.filtro;
+    const cont = document.getElementById('suporteConteudo');
+    if(cont){ cont.innerHTML = renderSuporteListaHtml(); attachHandlers(); }
+  });
 
   on('suporte-selecionar', (el)=>{
     const id = el.dataset.id;
