@@ -912,6 +912,11 @@ function pesquisaBaixarCsv(respostas){
 /* ============================= NOVIDADES E ATUALIZAÇÕES ============================= */
 // Lista do mais recente para o mais antigo — o primeiro item é sempre a versão vigente.
 const VERSOES = [
+  { versao:'2.1', data:'15/08/2026', itens:[
+    'Corrigida a Central de Suporte: os filtros de status agora refletem de forma consistente todo o ciclo de vida real de um chamado (Todos, Abertos, Em Análise, Encaminhados p/ Desenvolvimento, Encerrados) — nenhum chamado fica mais "sem categoria".',
+    'Novo botão "Iniciar análise" na tela do chamado, para o administrador marcar explicitamente que começou a tratar a solicitação.',
+    'Novo botão "Encaminhar para desenvolvimento" direto na tela do chamado, sem precisar voltar à lista para selecioná-lo.'
+  ]},
   { versao:'2.0', data:'15/08/2026', itens:[
     'Central de Suporte: administrador agora pode filtrar os chamados por status (Todos, Abertos, Em Análise, Encerrados), facilitando o acompanhamento do que ainda precisa de atenção.'
   ]},
@@ -980,12 +985,13 @@ function viewNovidades(){
 
 /* ============================= CENTRAL DE SUPORTE ============================= */
 let suporteAba = 'lista'; // 'lista' | 'novo' | 'detalhe'
-let suporteFiltroStatus = 'Todos'; // 'Todos' | 'Abertos' | 'Em análise' | 'Encerrados'
-const SUPORTE_FILTROS = ['Todos','Abertos','Em análise','Encerrados'];
+let suporteFiltroStatus = 'Todos'; // 'Todos' | 'Abertos' | 'Em análise' | 'Encaminhados' | 'Encerrados'
+const SUPORTE_FILTROS = ['Todos','Abertos','Em análise','Encaminhados p/ Desenvolvimento','Encerrados'];
 function suporteChamadoPassaFiltro(c){
   if(suporteFiltroStatus==='Todos') return true;
   if(suporteFiltroStatus==='Abertos') return c.status==='Aberto';
-  if(suporteFiltroStatus==='Em análise') return c.status==='Em análise';
+  if(suporteFiltroStatus==='Em análise') return ['Em análise','Aguardando resposta do professor','Aguardando resposta do administrador'].includes(c.status);
+  if(suporteFiltroStatus==='Encaminhados p/ Desenvolvimento') return ['Encaminhado para desenvolvimento','Aprovado para desenvolvimento'].includes(c.status);
   if(suporteFiltroStatus==='Encerrados') return c.status==='Resolvido' || c.status==='Encerrado';
   return true;
 }
@@ -1131,6 +1137,8 @@ function renderSuporteDetalheHtml(c){
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn ochre" data-action="suporte-responder">Enviar mensagem</button>
           ${currentRole==='admin' ? `<button class="btn secondary" data-action="suporte-pedir-info">Enviar e aguardar resposta do professor (7 dias)</button>` : ''}
+          ${currentRole==='admin' && c.status==='Aberto' ? `<button class="btn secondary" data-action="suporte-iniciar-analise" data-id="${c.id}">🔎 Iniciar análise</button>` : ''}
+          ${currentRole==='admin' && !['Encaminhado para desenvolvimento','Aprovado para desenvolvimento'].includes(c.status) ? `<button class="btn secondary" data-action="suporte-encaminhar-dev" data-id="${c.id}">📄 Encaminhar para desenvolvimento</button>` : ''}
           ${currentRole==='admin' && c.status==='Encaminhado para desenvolvimento' ? `<button class="btn secondary" data-action="suporte-aprovar-dev" data-id="${c.id}">✅ Aprovar para desenvolvimento</button>` : ''}
           <button class="btn secondary" data-action="suporte-encerrar" data-id="${c.id}">${currentRole==='admin' ? 'Encerrar chamado' : 'Marcar como resolvido'}</button>
         </div>
@@ -2247,6 +2255,37 @@ function attachHandlers(){
     suporteSelecionados.clear();
     toast(selecionados.length + ' chamado(s) encaminhado(s) para desenvolvimento.');
     await carregarSuporte();
+  });
+
+  on('suporte-iniciar-analise', async (el)=>{
+    const c = suporteCacheChamados.find(x=>x.id===el.dataset.id); if(!c) return;
+    const agora = Date.now();
+    const patch = {
+      status: 'Em análise',
+      mensagens: [...(c.mensagens||[]), { autor:'sistema', autorNome:'Sistema', texto:'Chamado em análise pelo administrador.', criadoEm: agora }]
+    };
+    try{
+      await window.__fbUpdateChamado(c.id, patch);
+      Object.assign(c, patch);
+      render(); await carregarSuporte();
+      toast('Chamado marcado como Em análise.');
+    }catch(e){ console.error(e); toast('Não foi possível atualizar agora.', 'warn'); }
+  });
+
+  on('suporte-encaminhar-dev', async (el)=>{
+    const c = suporteCacheChamados.find(x=>x.id===el.dataset.id); if(!c) return;
+    abrirRelatorioSuporte([c]);
+    const agora = Date.now();
+    const patch = {
+      status: 'Encaminhado para desenvolvimento',
+      mensagens: [...(c.mensagens||[]), { autor:'sistema', autorNome:'Sistema', texto:'Sua solicitação foi encaminhada e encontra-se em análise.', criadoEm: agora }]
+    };
+    try{
+      await window.__fbUpdateChamado(c.id, patch);
+      Object.assign(c, patch);
+      render(); await carregarSuporte();
+      toast('Chamado encaminhado para desenvolvimento.');
+    }catch(e){ console.error(e); toast('Não foi possível atualizar agora.', 'warn'); }
   });
 
   on('suporte-aprovar-dev', async (el)=>{
