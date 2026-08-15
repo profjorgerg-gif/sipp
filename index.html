@@ -930,11 +930,13 @@ function viewNovidades(){
 let suporteAba = 'lista'; // 'lista' | 'novo' | 'detalhe'
 let suporteChamadoAtualId = null;
 let suporteCacheChamados = [];
+let suporteSelecionados = new Set(); // ids marcados para o relatório de encaminhamento (só admin)
 
 const SUPORTE_STATUS_COR = {
   'Aberto': '#B8722E', 'Em análise': '#1E3A5F',
   'Aguardando resposta do professor': '#B14444', 'Aguardando resposta do administrador': '#B14444',
   'Resolvido': '#3F7D58', 'Encerrado': '#5B6B7A',
+  'Encaminhado para desenvolvimento': '#6B4FA0', 'Aprovado para desenvolvimento': '#2F7A4E',
 };
 function suporteBadge(status){
   const cor = SUPORTE_STATUS_COR[status] || '#5B6B7A';
@@ -989,20 +991,30 @@ async function suporteChecarPrazos(){
 }
 
 function renderSuporteListaHtml(){
-  const cabecalho = `<div class="topbar"><div><h1 class="page-title">${currentRole==='admin'?'Painel de Chamados':'Suporte'}</h1>
-      <div class="page-sub">${currentRole==='admin' ? 'Todos os chamados abertos pelos professores.' : 'Dúvidas, sugestões ou problemas? Abra um chamado.'}</div></div>
+  const isAdmin = currentRole==='admin';
+  const cabecalho = `<div class="topbar"><div><h1 class="page-title">${isAdmin?'Painel de Chamados':'Suporte'}</h1>
+      <div class="page-sub">${isAdmin ? 'Todos os chamados abertos pelos professores.' : 'Dúvidas, sugestões ou problemas? Abra um chamado.'}</div></div>
       <button class="btn ochre" data-action="suporte-novo">+ Novo Chamado</button></div>`;
   if(suporteCacheChamados.length===0){
-    return cabecalho + `<div class="empty">Nenhum chamado ${currentRole==='admin'?'registrado ainda':'aberto por você ainda'}.</div>`;
+    return cabecalho + `<div class="empty">Nenhum chamado ${isAdmin?'registrado ainda':'aberto por você ainda'}.</div>`;
   }
+  const barraRelatorio = isAdmin ? `
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+      <div class="hint">Marque os chamados abaixo para reunir num relatório de encaminhamento ao desenvolvimento.</div>
+      <button class="btn secondary small" data-action="suporte-gerar-relatorio">📄 Gerar relatório dos selecionados (${suporteSelecionados.size})</button>
+    </div>` : '';
   const ordenados = [...suporteCacheChamados].sort((a,b)=> (b.criadoEm||0)-(a.criadoEm||0));
   const rows = ordenados.map(c=>`
-    <div class="doc-card" data-action="suporte-abrir" data-id="${c.id}" style="cursor:pointer;">
-      <div class="doc-title">${esc(c.assunto)} <span class="hint">#${esc(c.numero)}</span></div>
-      <div class="doc-meta">${currentRole==='admin' ? esc(c.autorNome||c.autorEmail)+' · ' : ''}${new Date(c.criadoEm).toLocaleDateString('pt-BR')}</div>
-      <div style="margin-top:6px;">${suporteBadge(c.status)}</div>
+    <div class="doc-card" style="position:relative;${isAdmin?'padding-left:38px;':''}">
+      ${isAdmin ? `<input type="checkbox" data-action="suporte-selecionar" data-id="${c.id}" ${suporteSelecionados.has(c.id)?'checked':''}
+        style="position:absolute;left:12px;top:16px;width:16px;height:16px;">` : ''}
+      <div data-action="suporte-abrir" data-id="${c.id}" style="cursor:pointer;">
+        <div class="doc-title">${esc(c.assunto)} <span class="hint">#${esc(c.numero)}</span></div>
+        <div class="doc-meta">${isAdmin ? esc(c.autorNome||c.autorEmail)+' · ' : ''}${new Date(c.criadoEm).toLocaleDateString('pt-BR')}</div>
+        <div style="margin-top:6px;">${suporteBadge(c.status)}</div>
+      </div>
     </div>`).join('');
-  return cabecalho + `<div class="doc-grid">${rows}</div>`;
+  return cabecalho + barraRelatorio + `<div class="doc-grid">${rows}</div>`;
 }
 
 function renderSuporteNovoForm(){
@@ -1050,6 +1062,7 @@ function renderSuporteDetalheHtml(c){
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn ochre" data-action="suporte-responder">Enviar mensagem</button>
           ${currentRole==='admin' ? `<button class="btn secondary" data-action="suporte-pedir-info">Enviar e aguardar resposta do professor (7 dias)</button>` : ''}
+          ${currentRole==='admin' && c.status==='Encaminhado para desenvolvimento' ? `<button class="btn secondary" data-action="suporte-aprovar-dev" data-id="${c.id}">✅ Aprovar para desenvolvimento</button>` : ''}
           <button class="btn secondary" data-action="suporte-encerrar" data-id="${c.id}">${currentRole==='admin' ? 'Encerrar chamado' : 'Marcar como resolvido'}</button>
         </div>
       ` : podeReabrir ? `
@@ -1058,6 +1071,48 @@ function renderSuporteDetalheHtml(c){
       ` : `<div class="hint">Este chamado está encerrado.</div>`}
     </div>
   `;
+}
+
+function abrirRelatorioSuporte(selecionados){
+  const agora = new Date();
+  const p2 = n=>String(n).padStart(2,'0');
+  document.getElementById('printLabel').textContent = 'Relatório de Chamados para Desenvolvimento';
+  currentPrintFilename = `SIPP_Relatorio_Chamados_${agora.getFullYear()}-${p2(agora.getMonth()+1)}-${p2(agora.getDate())}_${p2(agora.getHours())}h${p2(agora.getMinutes())}.pdf`;
+  const itensHtml = selecionados.map((c,i)=>{
+    const msgsTxt = (c.mensagens||[]).map(m=>{
+      const autorLabel = m.autor==='sistema' ? 'Sistema' : (m.autor==='admin' ? 'Administração' : (c.autorNome||'Professor(a)'));
+      return `<tr><td class="hdr-label" style="width:26%;">${esc(autorLabel)}<br><span style="font-weight:400;font-size:10pt;">${new Date(m.criadoEm).toLocaleString('pt-BR')}</span></td><td>${esc(m.texto)}</td></tr>`;
+    }).join('');
+    return `
+      <div style="${i>0?'margin-top:26px;':''}">
+        <table>
+          <tbody>
+            <tr><td class="hdr-label">Protocolo</td><td>#${esc(c.numero)}</td></tr>
+            <tr><td class="hdr-label">Assunto</td><td><b>${esc(c.assunto)}</b></td></tr>
+            <tr><td class="hdr-label">Autor(a)</td><td>${esc(c.autorNome||c.autorEmail)} (${esc(c.autorEmail||'')})</td></tr>
+            <tr><td class="hdr-label">Aberto em</td><td>${new Date(c.criadoEm).toLocaleDateString('pt-BR')}</td></tr>
+            <tr><td class="hdr-label">Status no momento do relatório</td><td>${esc(c.status)}</td></tr>
+          </tbody>
+        </table>
+        <table style="margin-top:8px;">
+          <thead><tr><th colspan="2">Histórico da conversa</th></tr></thead>
+          <tbody>${msgsTxt || '<tr><td colspan="2">Sem mensagens.</td></tr>'}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+
+  document.getElementById('printArea').innerHTML = `
+    <div class="doctitle">RELATÓRIO DE CHAMADOS PARA DESENVOLVIMENTO</div>
+    <table style="margin-bottom:14px;">
+      <tbody>
+        <tr><td class="hdr-label">Gerado em</td><td>${agora.toLocaleDateString('pt-BR')} às ${p2(agora.getHours())}:${p2(agora.getMinutes())}</td></tr>
+        <tr><td class="hdr-label">Total de chamados</td><td>${selecionados.length}</td></tr>
+      </tbody>
+    </table>
+    ${itensHtml}
+  `;
+  document.getElementById('printOverlay').classList.add('show');
+  const _ob = document.getElementById('btnAbrirPdf'); if(_ob) _ob.style.display='none';
 }
 
 function viewDocumentos(){
@@ -2104,6 +2159,46 @@ function attachHandlers(){
   on('suporte-cancelar', ()=>{ suporteAba='lista'; render(); carregarSuporte(); });
   on('suporte-voltar', ()=>{ suporteAba='lista'; suporteChamadoAtualId=null; render(); carregarSuporte(); });
   on('suporte-abrir', async (el)=>{ suporteAba='detalhe'; suporteChamadoAtualId=el.dataset.id; render(); await carregarSuporte(); });
+
+  on('suporte-selecionar', (el)=>{
+    const id = el.dataset.id;
+    if(el.checked) suporteSelecionados.add(id); else suporteSelecionados.delete(id);
+    const btn = document.querySelector('[data-action="suporte-gerar-relatorio"]');
+    if(btn) btn.textContent = '📄 Gerar relatório dos selecionados (' + suporteSelecionados.size + ')';
+  });
+
+  on('suporte-gerar-relatorio', async ()=>{
+    if(suporteSelecionados.size===0){ toast('Selecione ao menos um chamado para o relatório.', 'warn'); return; }
+    const selecionados = suporteCacheChamados.filter(c=> suporteSelecionados.has(c.id));
+    abrirRelatorioSuporte(selecionados);
+    const agora = Date.now();
+    for(const c of selecionados){
+      const patch = {
+        status: 'Encaminhado para desenvolvimento',
+        mensagens: [...(c.mensagens||[]), { autor:'sistema', autorNome:'Sistema', texto:'Sua solicitação foi encaminhada e encontra-se em análise.', criadoEm: agora }]
+      };
+      try{ await window.__fbUpdateChamado(c.id, patch); Object.assign(c, patch); }
+      catch(e){ console.error('Falha ao atualizar chamado', c.id, e); }
+    }
+    suporteSelecionados.clear();
+    toast(selecionados.length + ' chamado(s) encaminhado(s) para desenvolvimento.');
+    await carregarSuporte();
+  });
+
+  on('suporte-aprovar-dev', async (el)=>{
+    const c = suporteCacheChamados.find(x=>x.id===el.dataset.id); if(!c) return;
+    const agora = Date.now();
+    const patch = {
+      status: 'Aprovado para desenvolvimento',
+      mensagens: [...(c.mensagens||[]), { autor:'sistema', autorNome:'Sistema', texto:'Solicitação aprovada — seguirá para implementação no SIPP.', criadoEm: agora }]
+    };
+    try{
+      await window.__fbUpdateChamado(c.id, patch);
+      Object.assign(c, patch);
+      render(); await carregarSuporte();
+      toast('Marcado como Aprovado para desenvolvimento.');
+    }catch(e){ console.error(e); toast('Não foi possível atualizar agora.', 'warn'); }
+  });
 
   on('suporte-criar', async ()=>{
     const assunto = val('sup_assunto'); const descricao = val('sup_descricao');
