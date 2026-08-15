@@ -389,6 +389,32 @@ legend{font-size:12px;font-weight:700;color:var(--ochre);padding:0 6px;}
   </div>
 </div>
 
+<div id="welcomeOverlay" style="position:fixed;inset:0;background:rgba(10,15,20,.6);z-index:998;display:none;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:32px 30px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35);">
+    <div style="font-size:40px;">🙌</div>
+    <h2 style="font-family:var(--serif,'Times New Roman',serif);color:#152B47;margin:12px 0 6px 0;">Obrigado por testar o SIPP!</h2>
+    <p style="color:#5B6B7A;font-size:14px;line-height:1.6;margin:0 0 18px 0;">
+      Sua participação é muito importante nessa fase. Fique à vontade para lançar um Planejamento ou Sequência,
+      no seu ritmo. <b>Depois de testar, não esqueça de responder a Pesquisa de Avaliação</b> — é rapidinho e
+      ajuda demais a decidir os próximos passos do projeto.
+    </p>
+    <button class="btn ochre" id="btnWelcomeContinuar" style="width:100%;">Continuar</button>
+    <button class="btn secondary" id="btnWelcomePesquisa" style="width:100%;margin-top:8px;">Ir para a Pesquisa agora</button>
+  </div>
+</div>
+
+<div id="logoutOverlay" style="position:fixed;inset:0;background:rgba(10,15,20,.6);z-index:998;display:none;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:14px;max-width:420px;width:100%;padding:32px 30px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35);">
+    <div style="font-size:36px;">📋</div>
+    <h2 style="font-family:var(--serif,'Times New Roman',serif);color:#152B47;margin:12px 0 6px 0;">Antes de sair...</h2>
+    <p style="color:#5B6B7A;font-size:14px;line-height:1.6;margin:0 0 18px 0;">
+      Já respondeu a Pesquisa de Avaliação? Suas respostas ajudam bastante a decidir os próximos passos do SIPP.
+    </p>
+    <button class="btn ochre" id="btnLogoutPesquisaAgora" style="width:100%;">Responder agora</button>
+    <button class="btn secondary" id="btnLogoutDepois" style="width:100%;margin-top:8px;">Já respondi / Responder depois</button>
+  </div>
+</div>
+
 <script>
 // Documentos oficiais embutidos (PDF) — Checklist atualizado em 14/08/2026 02h36
 const DOCS_ASSETS = {
@@ -1083,6 +1109,7 @@ function viewTurmas(){
   const rows = state.turmas.map(t=>`
     <div class="doc-card">
       <div class="doc-title">${esc(t.nome)}</div>
+      ${t.modalidade ? `<div class="doc-meta">Modalidade: <b>${esc(t.modalidade)}</b></div>` : ''}
       <div class="doc-actions">
         <button class="btn small secondary" data-action="edit-turma" data-id="${t.id}">Editar</button>
         <button class="btn small danger" data-action="del-turma" data-id="${t.id}">Excluir</button>
@@ -1096,7 +1123,12 @@ function viewTurmas(){
     <div class="card">
       <h3>${editing ? 'Editar turma' : 'Nova turma'}</h3>
       <div class="grid2">
-        <div class="field" style="grid-column:1/3;"><label>Identificação da turma</label><input id="t_nome" type="text" placeholder="Ex.: 201" value="${esc(editing?editing.nome:'')}"></div>
+        <div class="field"><label>Identificação da turma</label><input id="t_nome" type="text" placeholder="Ex.: 201" value="${esc(editing?editing.nome:'')}"></div>
+        <div class="field"><label>Modalidade</label><select id="t_modalidade">
+          <option value="" ${!editing||!editing.modalidade?'selected':''}>Ambas / não se aplica</option>
+          <option value="Pós-Médio" ${editing&&editing.modalidade==='Pós-Médio'?'selected':''}>Pós-Médio</option>
+          <option value="EMIEP" ${editing&&editing.modalidade==='EMIEP'?'selected':''}>EMIEP</option>
+        </select><div class="hint">Define em quais Planejamentos esta turma aparece para escolha (por modalidade).</div></div>
       </div>
       ${editing ? `
         <button class="btn" data-action="save-turma-edit">Salvar alterações</button>
@@ -1191,14 +1223,16 @@ function viewPlanejForm(){
     .filter(c => !c.modalidade || c.modalidade === modalidadeAtual)
     .map(c=>`<option value="${esc(c.nome)}" ${pl.curso===c.nome?'selected':''}>${esc(c.nome)}</option>`).join('');
   const plTurmasSel = lines((pl.turmas||'').replace(/,/g,'\n'));
-  const turmasField = state.turmas.length ? `
+  const turmasFiltradas = state.turmas.filter(t => !t.modalidade || t.modalidade === modalidadeAtual);
+  const turmasField = turmasFiltradas.length ? `
     <div class="field" style="grid-column:1/-1;"><label>Turma(s)</label>
-      <div class="checklist" style="grid-template-columns:repeat(auto-fill,minmax(70px,1fr));">
-        ${state.turmas.map(t=>`<label><input type="checkbox" name="turmasChk" value="${esc(t.nome)}" ${plTurmasSel.includes(t.nome)?'checked':''}> ${esc(t.nome)}</label>`).join('')}
+      <div class="checklist" id="turmasChecklist" style="grid-template-columns:repeat(auto-fill,minmax(70px,1fr));">
+        ${turmasFiltradas.map(t=>`<label><input type="checkbox" name="turmasChk" value="${esc(t.nome)}" ${plTurmasSel.includes(t.nome)?'checked':''}> ${esc(t.nome)}</label>`).join('')}
       </div>
       <div class="hint">Cadastre turmas em Cadastros → Turmas.</div>
-    </div>` : `
-    <div class="field"><label>Turma(s)</label><input id="f_turmasFallback" type="text" value="${esc(pl.turmas||'')}" placeholder="201, 202, 203..."><div class="hint">Nenhuma turma cadastrada — <button class="btn small secondary" type="button" data-nav="turmas">cadastrar turmas</button> para usar seleção rápida.</div></div>`;
+    </div>` : (state.turmas.length ? `
+    <div class="field"><label>Turma(s)</label><input id="f_turmasFallback" type="text" value="${esc(pl.turmas||'')}" placeholder="201, 202, 203..."><div class="hint">Nenhuma turma cadastrada para a modalidade "${esc(modalidadeAtual)}" — <button class="btn small secondary" type="button" data-nav="turmas">edite as turmas</button> ou digite manualmente.</div></div>` : `
+    <div class="field"><label>Turma(s)</label><input id="f_turmasFallback" type="text" value="${esc(pl.turmas||'')}" placeholder="201, 202, 203..."><div class="hint">Nenhuma turma cadastrada — <button class="btn small secondary" type="button" data-nav="turmas">cadastrar turmas</button> para usar seleção rápida.</div></div>`);
   const disciplinaOpts = state.disciplinas.map(d=>`<option value="${esc(d.nome)}" ${pl.componente===d.nome?'selected':''}>${esc(d.nome)}</option>`).join('');
   const componenteField = state.disciplinas.length ? `
     <div class="field"><label>Componente curricular</label><select id="f_componenteSel"><option value="">— selecione —</option>${disciplinaOpts}</select><div class="hint">Cadastre em Cadastros → Disciplinas.</div></div>` : `
@@ -1424,7 +1458,7 @@ function attachHandlers(){
     });
   });
 
-  // Planejamento: filtra a lista de Cursos conforme a Modalidade escolhida, sem perder o resto do formulário.
+  // Planejamento: filtra a lista de Cursos e Turmas conforme a Modalidade escolhida, sem perder o resto do formulário.
   const fModalidade = document.getElementById('f_modalidade');
   const fCurso = document.getElementById('f_curso');
   if(fModalidade && fCurso){
@@ -1436,6 +1470,15 @@ function attachHandlers(){
       fCurso.innerHTML = '<option value="">— selecione —</option>' +
         opts.map(c => `<option value="${esc(c.nome)}" ${c.nome===cursoAtual?'selected':''}>${esc(c.nome)}</option>`).join('');
       if(!aindaValido) toast('A lista de cursos foi atualizada para a modalidade escolhida.');
+
+      const turmasBox = document.getElementById('turmasChecklist');
+      if(turmasBox){
+        const marcadas = Array.from(turmasBox.querySelectorAll('input[name="turmasChk"]:checked')).map(cb=>cb.value);
+        const turmasOpts = state.turmas.filter(t => !t.modalidade || t.modalidade === modalidadeSel);
+        turmasBox.innerHTML = turmasOpts.map(t=>`<label><input type="checkbox" name="turmasChk" value="${esc(t.nome)}" ${marcadas.includes(t.nome)?'checked':''}> ${esc(t.nome)}</label>`).join('');
+        const perdidas = marcadas.filter(nome => !turmasOpts.some(t=>t.nome===nome));
+        if(perdidas.length) toast('Algumas turmas marcadas não pertencem à nova modalidade e foram desmarcadas: ' + perdidas.join(', '), 'warn');
+      }
     });
   }
   const buscaEl = document.getElementById('pf_busca');
@@ -1528,7 +1571,7 @@ function attachHandlers(){
 
   on('add-turma', async ()=>{
     const nome = val('t_nome'); if(!nome){ toast('Informe a turma.', 'warn'); return; }
-    state.turmas.push({ id: uid(), nome });
+    state.turmas.push({ id: uid(), nome, modalidade: val('t_modalidade') || '' });
     await save('turmas'); render();
   });
   on('edit-turma', (el)=>{ editingTurmaId = el.dataset.id; render(); });
@@ -1536,7 +1579,7 @@ function attachHandlers(){
   on('save-turma-edit', async ()=>{
     const nome = val('t_nome'); if(!nome){ toast('Informe a turma.', 'warn'); return; }
     const t = state.turmas.find(t=>t.id===editingTurmaId);
-    if(t){ t.nome = nome; await save('turmas'); }
+    if(t){ t.nome = nome; t.modalidade = val('t_modalidade') || ''; await save('turmas'); }
     editingTurmaId = null; render();
     toast('Turma atualizada.');
   });
@@ -2080,7 +2123,15 @@ async function startApp(){
   view = 'inicio';
   document.querySelectorAll('.nav-item[data-view]').forEach(n=>n.classList.toggle('active', n.dataset.view==='inicio'));
   render();
+  document.getElementById('welcomeOverlay').style.display = 'flex';
 }
+document.getElementById('btnWelcomeContinuar').addEventListener('click', ()=>{
+  document.getElementById('welcomeOverlay').style.display = 'none';
+});
+document.getElementById('btnWelcomePesquisa').addEventListener('click', ()=>{
+  document.getElementById('welcomeOverlay').style.display = 'none';
+  setView('pesquisa');
+});
 
 document.getElementById('btnGoogleLogin').addEventListener('click', async ()=>{
   const note = document.getElementById('loginStatusNote');
@@ -2097,12 +2148,23 @@ document.getElementById('btnGoogleLogin').addEventListener('click', async ()=>{
     note.textContent = 'Não foi possível entrar agora (' + (e.message||'erro desconhecido') + '). Tente novamente.';
   }
 });
-document.getElementById('btnLogout').addEventListener('click', async ()=>{
+async function fazerLogoutDeVerdade(){
   try{ await window.__fbLogout(); }catch(e){ console.error(e); }
   currentRole = null; currentUid = null; currentEmail = null; currentNome = null;
   document.getElementById('app').classList.remove('show');
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('loginStatusNote').textContent = 'Login real com sua Conta Google. Seus dados ficam salvos e isolados por conta.';
+}
+document.getElementById('btnLogout').addEventListener('click', ()=>{
+  document.getElementById('logoutOverlay').style.display = 'flex';
+});
+document.getElementById('btnLogoutPesquisaAgora').addEventListener('click', ()=>{
+  document.getElementById('logoutOverlay').style.display = 'none';
+  setView('pesquisa');
+});
+document.getElementById('btnLogoutDepois').addEventListener('click', async ()=>{
+  document.getElementById('logoutOverlay').style.display = 'none';
+  await fazerLogoutDeVerdade();
 });
 </script>
 </body>
