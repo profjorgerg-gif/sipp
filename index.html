@@ -592,7 +592,7 @@ function setView(v){
   if(v!=='turmas') editingTurmaId=null;
   if(v!=='disciplinas') editingDisciplinaId=null;
   if(v==='pesquisa') pesquisaAba='responder';
-  if(v==='suporte'){ suporteAba='lista'; suporteChamadoAtualId=null; suporteFiltroStatus='Todos'; }
+  if(v==='suporte'){ suporteAba='lista'; suporteChamadoAtualId=null; }
   document.querySelectorAll('.nav-item[data-view]').forEach(n=>n.classList.toggle('active', n.dataset.view===v));
   const cadastroViews = ['perfil','escolas','cursos','turmas','disciplinas'];
   const submenu = document.getElementById('submenuCadastros');
@@ -912,25 +912,10 @@ function pesquisaBaixarCsv(respostas){
 /* ============================= NOVIDADES E ATUALIZAÇÕES ============================= */
 // Lista do mais recente para o mais antigo — o primeiro item é sempre a versão vigente.
 const VERSOES = [
-  { versao:'2.1', data:'15/08/2026', itens:[
-    'Corrigida a Central de Suporte: os filtros de status agora refletem de forma consistente todo o ciclo de vida real de um chamado (Todos, Abertos, Em Análise, Encaminhados p/ Desenvolvimento, Encerrados) — nenhum chamado fica mais "sem categoria".',
-    'Novo botão "Iniciar análise" na tela do chamado, para o administrador marcar explicitamente que começou a tratar a solicitação.',
-    'Novo botão "Encaminhar para desenvolvimento" direto na tela do chamado, sem precisar voltar à lista para selecioná-lo.'
-  ]},
-  { versao:'2.0', data:'15/08/2026', itens:[
-    'Central de Suporte: administrador agora pode filtrar os chamados por status (Todos, Abertos, Em Análise, Encerrados), facilitando o acompanhamento do que ainda precisa de atenção.'
-  ]},
-  { versao:'1.9', data:'15/08/2026', itens:[
-    'Nova área "Documentos" no menu, com Checklist de Desenvolvimento, Manual do Sistema e Manual do Professor disponíveis direto no sistema (visualização e download em PDF).',
-    'Administrador visualiza os três documentos; Professor(a) tem acesso ao Manual do Professor.'
-  ]},
-  { versao:'1.8', data:'15/08/2026', itens:[
-    'Ao clicar em "Sair", o sistema agora oferece a opção de baixar um backup dos seus dados (.json) antes de encerrar a sessão.'
-  ]},
-  { versao:'1.7', data:'15/08/2026', itens:[
-    'Nova Central de Suporte (menu "Suporte"): abra chamados com número de protocolo e converse diretamente com o administrador.',
-    'Acompanhamento de status do chamado (Aberto, Em análise, Aguardando resposta, Resolvido, Encerrado, entre outros), com encerramento automático após o prazo de resposta e possibilidade de reabertura em até 7 dias.',
-    'Administrador pode selecionar chamados e gerar um relatório em PDF para encaminhamento ao desenvolvimento do sistema.'
+  { versao:'1.7', data:'17/08/2026', itens:[
+    'O formulário de Planejamento agora muda conforme a Modalidade: EMIEP segue o modelo Anual com conteúdo por trimestre e competências da BNCC; Pós-Médio segue o modelo Semestral (objetos de conhecimento, metodologia, recursos, recuperação paralela), sem a tabela de trimestres.',
+    'O campo "Tipo" do Planejamento passou a ser definido automaticamente pela Modalidade, evitando combinações incorretas (ex.: EMIEP marcado como Semestral).',
+    'O PDF do Planejamento agora segue o layout correto de cada modalidade.'
   ]},
   { versao:'1.6', data:'15/08/2026', itens:[
     'Nova área "Novidades" no menu, com o histórico completo de versões do sistema.',
@@ -985,16 +970,6 @@ function viewNovidades(){
 
 /* ============================= CENTRAL DE SUPORTE ============================= */
 let suporteAba = 'lista'; // 'lista' | 'novo' | 'detalhe'
-let suporteFiltroStatus = 'Todos'; // 'Todos' | 'Abertos' | 'Em análise' | 'Encaminhados' | 'Encerrados'
-const SUPORTE_FILTROS = ['Todos','Abertos','Em análise','Encaminhados p/ Desenvolvimento','Encerrados'];
-function suporteChamadoPassaFiltro(c){
-  if(suporteFiltroStatus==='Todos') return true;
-  if(suporteFiltroStatus==='Abertos') return c.status==='Aberto';
-  if(suporteFiltroStatus==='Em análise') return ['Em análise','Aguardando resposta do professor','Aguardando resposta do administrador'].includes(c.status);
-  if(suporteFiltroStatus==='Encaminhados p/ Desenvolvimento') return ['Encaminhado para desenvolvimento','Aprovado para desenvolvimento'].includes(c.status);
-  if(suporteFiltroStatus==='Encerrados') return c.status==='Resolvido' || c.status==='Encerrado';
-  return true;
-}
 let suporteChamadoAtualId = null;
 let suporteCacheChamados = [];
 let suporteSelecionados = new Set(); // ids marcados para o relatório de encaminhamento (só admin)
@@ -1065,20 +1040,12 @@ function renderSuporteListaHtml(){
   if(suporteCacheChamados.length===0){
     return cabecalho + `<div class="empty">Nenhum chamado ${isAdmin?'registrado ainda':'aberto por você ainda'}.</div>`;
   }
-  const barraFiltro = isAdmin ? `
-    <div class="card" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-      <div class="hint" style="margin-right:4px;">Filtrar:</div>
-      ${SUPORTE_FILTROS.map(f=>`<button class="btn ${f===suporteFiltroStatus?'':'secondary'} small" data-action="suporte-filtro" data-filtro="${esc(f)}">${esc(f)}</button>`).join('')}
-    </div>` : '';
   const barraRelatorio = isAdmin ? `
     <div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
       <div class="hint">Marque os chamados abaixo para reunir num relatório de encaminhamento ao desenvolvimento.</div>
       <button class="btn secondary small" data-action="suporte-gerar-relatorio">📄 Gerar relatório dos selecionados (${suporteSelecionados.size})</button>
     </div>` : '';
-  const ordenados = [...suporteCacheChamados].filter(suporteChamadoPassaFiltro).sort((a,b)=> (b.criadoEm||0)-(a.criadoEm||0));
-  if(isAdmin && ordenados.length===0){
-    return cabecalho + barraFiltro + `<div class="empty">Nenhum chamado com o filtro "${esc(suporteFiltroStatus)}".</div>`;
-  }
+  const ordenados = [...suporteCacheChamados].sort((a,b)=> (b.criadoEm||0)-(a.criadoEm||0));
   const rows = ordenados.map(c=>`
     <div class="doc-card" style="position:relative;${isAdmin?'padding-left:38px;':''}">
       ${isAdmin ? `<input type="checkbox" data-action="suporte-selecionar" data-id="${c.id}" ${suporteSelecionados.has(c.id)?'checked':''}
@@ -1089,7 +1056,7 @@ function renderSuporteListaHtml(){
         <div style="margin-top:6px;">${suporteBadge(c.status)}</div>
       </div>
     </div>`).join('');
-  return cabecalho + barraFiltro + barraRelatorio + `<div class="doc-grid">${rows}</div>`;
+  return cabecalho + barraRelatorio + `<div class="doc-grid">${rows}</div>`;
 }
 
 function renderSuporteNovoForm(){
@@ -1137,8 +1104,6 @@ function renderSuporteDetalheHtml(c){
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn ochre" data-action="suporte-responder">Enviar mensagem</button>
           ${currentRole==='admin' ? `<button class="btn secondary" data-action="suporte-pedir-info">Enviar e aguardar resposta do professor (7 dias)</button>` : ''}
-          ${currentRole==='admin' && c.status==='Aberto' ? `<button class="btn secondary" data-action="suporte-iniciar-analise" data-id="${c.id}">🔎 Iniciar análise</button>` : ''}
-          ${currentRole==='admin' && !['Encaminhado para desenvolvimento','Aprovado para desenvolvimento'].includes(c.status) ? `<button class="btn secondary" data-action="suporte-encaminhar-dev" data-id="${c.id}">📄 Encaminhar para desenvolvimento</button>` : ''}
           ${currentRole==='admin' && c.status==='Encaminhado para desenvolvimento' ? `<button class="btn secondary" data-action="suporte-aprovar-dev" data-id="${c.id}">✅ Aprovar para desenvolvimento</button>` : ''}
           <button class="btn secondary" data-action="suporte-encerrar" data-id="${c.id}">${currentRole==='admin' ? 'Encerrar chamado' : 'Marcar como resolvido'}</button>
         </div>
@@ -1627,14 +1592,14 @@ function viewPlanejForm(){
   return `
     <div class="topbar"><div>
       <h1 class="page-title">${isNew?'Novo':'Editar'} Planejamento</h1>
-      <div class="page-sub">Os campos abaixo seguem a estrutura do formulário oficial de Planejamento Anual/Semestral.</div>
+      <div class="page-sub">Os campos mudam conforme a Modalidade: EMIEP segue o modelo Anual (por trimestre); Pós-Médio segue o modelo Semestral.</div>
     </div></div>
 
     <div class="card">
       <h3>Configuração geral</h3>
       <div class="grid3">
-        <div class="field"><label>Tipo</label><select id="f_tipo"><option ${pl.tipo==='Anual'?'selected':''}>Anual</option><option ${pl.tipo==='Semestral'?'selected':''}>Semestral</option></select></div>
-        <div class="field"><label>Modalidade</label><select id="f_modalidade"><option ${pl.modalidade==='Pós-Médio'?'selected':''}>Pós-Médio</option><option ${pl.modalidade==='EMIEP'?'selected':''}>EMIEP</option></select></div>
+        <div class="field"><label>Modalidade</label><select id="f_modalidade"><option value="Pós-Médio" ${modalidadeAtual==='Pós-Médio'?'selected':''}>Pós-Médio</option><option value="EMIEP" ${modalidadeAtual==='EMIEP'?'selected':''}>EMIEP</option></select></div>
+        <div class="field"><label>Tipo</label><input id="f_tipoDisplay" type="text" value="${modalidadeAtual==='EMIEP'?'Anual (por trimestre)':'Semestral'}" disabled><div class="hint">Definido automaticamente pela Modalidade: EMIEP é sempre Anual/trimestral; Pós-Médio é sempre Semestral.</div></div>
         <div class="field"><label>Ano letivo</label><input id="f_ano" type="text" value="${esc(pl.anoLetivo||new Date().getFullYear())}"></div>
         <div class="field"><label>Escola</label>${state.escolas.length ? `<select id="f_escola"><option value="">— selecione —</option>${state.escolas.map(esch=>`<option value="${esc(esch.nome)}" ${pl.escola===esch.nome?'selected':''}>${esc(esch.nome)}</option>`).join('')}</select>` : `<input id="f_escola" type="text" value="${esc(pl.escola||'')}" placeholder="Ex.: CEDUP Hermann Hering">`}<div class="hint">Cadastre em Cadastros → Escolas.</div></div>
         <div class="field"><label>Curso</label><select id="f_curso"><option value="">— selecione —</option>${cursoOpts}</select><div class="hint">Cadastre cursos em Cadastros → Cursos.</div></div>
@@ -1646,31 +1611,55 @@ function viewPlanejForm(){
       </div>
     </div>
 
-    <div class="card">
-      <h3>Objetivos e competências</h3>
-      <div class="field"><label>Objetivo geral do componente</label><textarea id="f_objetivo" rows="3">${esc(pl.objetivo||'')}</textarea></div>
-      <div class="field"><label>Competências gerais da BNCC</label><textarea id="f_compGerais" rows="3" placeholder="Uma competência por linha">${esc(pl.compGerais||'')}</textarea><div class="hint">Uma por linha — cada linha vira um parágrafo no documento.</div></div>
-      <div class="field"><label>Competências específicas da área</label><textarea id="f_compEspecificas" rows="3" placeholder="Uma competência por linha">${esc(pl.compEspecificas||'')}</textarea></div>
+    <div id="blocoModEMIEP" style="display:${modalidadeAtual==='EMIEP'?'block':'none'};">
+      <div class="card">
+        <h3>Objetivos e competências</h3>
+        <div class="field"><label>Objetivo geral do componente</label><textarea id="f_objetivo" rows="3">${esc(pl.objetivo||'')}</textarea></div>
+        <div class="field"><label>Competências gerais da BNCC</label><textarea id="f_compGerais" rows="3" placeholder="Uma competência por linha">${esc(pl.compGerais||'')}</textarea><div class="hint">Uma por linha — cada linha vira um parágrafo no documento.</div></div>
+        <div class="field"><label>Competências específicas da área</label><textarea id="f_compEspecificas" rows="3" placeholder="Uma competência por linha">${esc(pl.compEspecificas||'')}</textarea></div>
+      </div>
+
+      <div class="card">
+        <h3>Conteúdo por trimestre</h3>
+        <div class="hint" style="margin-bottom:10px;">Modelo do Planejamento Anual do EMIEP — conteúdo estruturado em 1º, 2º e 3º trimestres.</div>
+        <div id="blocosBox"></div>
+        <button class="btn secondary small" data-action="add-bloco">+ Adicionar bloco de conteúdo</button>
+      </div>
+
+      <div class="card">
+        <h3>Articulação, projetos e metodologia</h3>
+        <div class="field"><label>Plano de articulação com 2º professores / adaptações curriculares</label><textarea id="f_articulacao" rows="3">${esc(pl.articulacao||'')}</textarea></div>
+        <div class="field"><label>Projetos integradores</label><textarea id="f_projetos" rows="3">${esc(pl.projetos||'')}</textarea></div>
+        <div class="field"><label>Metodologia</label><textarea id="f_metodologia" rows="3" placeholder="Uma estratégia por linha">${esc(pl.metodologia||'')}</textarea></div>
+        <div class="field"><label>Observações gerais / regras de sala</label><textarea id="f_observacoes" rows="3">${esc(pl.observacoes||'')}</textarea></div>
+      </div>
     </div>
 
-    <div class="card">
-      <h3>Conteúdo por trimestre</h3>
-      <div id="blocosBox"></div>
-      <button class="btn secondary small" data-action="add-bloco">+ Adicionar bloco de conteúdo</button>
-    </div>
+    <div id="blocoModPosMedio" style="display:${modalidadeAtual==='Pós-Médio'?'block':'none'};">
+      <div class="card">
+        <h3>Conteúdo do semestre</h3>
+        <div class="hint" style="margin-bottom:10px;">Modelo do Planejamento Semestral Pós-Médio — sem tabela por trimestre nem competências da BNCC, conforme o formulário oficial.</div>
+        <div class="field"><label>Objetos de conhecimento</label><textarea id="f_objetosPM" rows="3">${esc(pl.objetosPM||'')}</textarea></div>
+        <div class="field"><label>Habilidades</label><textarea id="f_habilidadesPM" rows="3" placeholder="Uma por linha">${esc(pl.habilidadesPM||'')}</textarea></div>
+        <div class="field"><label>Objetivo de aprendizagem</label><textarea id="f_objetivoAprendizagemPM" rows="3">${esc(pl.objetivoAprendizagemPM||'')}</textarea></div>
+      </div>
 
-    <div class="card">
-      <h3>Articulação, projetos e metodologia</h3>
-      <div class="field"><label>Plano de articulação com 2º professores / adaptações curriculares</label><textarea id="f_articulacao" rows="3">${esc(pl.articulacao||'')}</textarea></div>
-      <div class="field"><label>Projetos integradores</label><textarea id="f_projetos" rows="3">${esc(pl.projetos||'')}</textarea></div>
-      <div class="field"><label>Metodologia</label><textarea id="f_metodologia" rows="3" placeholder="Uma estratégia por linha">${esc(pl.metodologia||'')}</textarea></div>
-      <div class="field"><label>Observações gerais / regras de sala</label><textarea id="f_observacoes" rows="3">${esc(pl.observacoes||'')}</textarea></div>
+      <div class="card">
+        <h3>Metodologia e recursos</h3>
+        <div class="field"><label>Metodologia de ensino-aprendizagem</label><textarea id="f_metodologiaPM" rows="3" placeholder="Uma estratégia por linha">${esc(pl.metodologiaPM||'')}</textarea></div>
+        <div class="field"><label>Recursos utilizados</label><textarea id="f_recursosPM" rows="2" placeholder="Uma por linha">${esc(pl.recursosPM||'')}</textarea></div>
+      </div>
     </div>
 
     <div class="card">
       <h3>Avaliação</h3>
       <div class="checklist">${avalHtml}</div>
       <div class="field" style="margin-top:10px;"><label>Outros instrumentos (opcional)</label><input id="f_avalOutros" type="text" value="${esc(pl.avalOutros||'')}"></div>
+      <div id="blocoAvalPosMedio" style="display:${modalidadeAtual==='Pós-Médio'?'block':'none'};margin-top:10px;">
+        <div class="field"><label>Datas previstas de avaliações e recuperações</label><textarea id="f_datasAvalPM" rows="2">${esc(pl.datasAvalPM||'')}</textarea></div>
+        <div class="field"><label>Recuperação paralela de aprendizagem</label><textarea id="f_recuperacaoPM" rows="3">${esc(pl.recuperacaoPM||'')}</textarea></div>
+        <div class="field"><label>Adaptações e observações</label><textarea id="f_adaptacoesPM" rows="3">${esc(pl.adaptacoesPM||'')}</textarea></div>
+      </div>
     </div>
 
     <div class="card">
@@ -1861,6 +1850,15 @@ function attachHandlers(){
       fCurso.innerHTML = '<option value="">— selecione —</option>' +
         opts.map(c => `<option value="${esc(c.nome)}" ${c.nome===cursoAtual?'selected':''}>${esc(c.nome)}</option>`).join('');
       if(!aindaValido) toast('A lista de cursos foi atualizada para a modalidade escolhida.');
+
+      const tipoDisplay = document.getElementById('f_tipoDisplay');
+      if(tipoDisplay) tipoDisplay.value = modalidadeSel==='EMIEP' ? 'Anual (por trimestre)' : 'Semestral';
+      const blocoEMIEP = document.getElementById('blocoModEMIEP');
+      const blocoPM = document.getElementById('blocoModPosMedio');
+      const blocoAvalPM = document.getElementById('blocoAvalPosMedio');
+      if(blocoEMIEP) blocoEMIEP.style.display = modalidadeSel==='EMIEP' ? 'block' : 'none';
+      if(blocoPM) blocoPM.style.display = modalidadeSel==='Pós-Médio' ? 'block' : 'none';
+      if(blocoAvalPM) blocoAvalPM.style.display = modalidadeSel==='Pós-Médio' ? 'block' : 'none';
 
       const turmasBox = document.getElementById('turmasChecklist');
       if(turmasBox){
@@ -2083,17 +2081,25 @@ function attachHandlers(){
   }
   on('save-planej', async ()=>{
     const existing = editingPlanejId!=='new' ? getPlanej(editingPlanejId) : null;
+    const modalidadeSalva = val('f_modalidade');
     const obj = {
       id: editingPlanejId==='new' ? uid() : editingPlanejId,
       criadoEm: existing ? (existing.criadoEm || 0) : Date.now(),
       status: 'Pronto',
-      tipo: val('f_tipo'), modalidade: val('f_modalidade'), anoLetivo: val('f_ano'), escola: val('f_escola'),
+      tipo: modalidadeSalva==='EMIEP' ? 'Anual' : 'Semestral', modalidade: modalidadeSalva, anoLetivo: val('f_ano'), escola: val('f_escola'),
       curso: val('f_curso'), turmas: getTurmasFromForm(), aulasSemanais: val('f_aulas'),
       componente: getComponenteFromForm(), professor: val('f_professor'), area: val('f_area'),
+      // Campos do modelo EMIEP (Anual/trimestral)
       objetivo: val('f_objetivo'), compGerais: val('f_compGerais'), compEspecificas: val('f_compEspecificas'),
       blocos: JSON.parse(JSON.stringify(formBlocos)),
       articulacao: val('f_articulacao'), projetos: val('f_projetos'), metodologia: val('f_metodologia'),
-      observacoes: val('f_observacoes'), avaliacao: checkedList('aval'), avalOutros: val('f_avalOutros'),
+      observacoes: val('f_observacoes'),
+      // Campos do modelo Pós-Médio (Semestral)
+      objetosPM: val('f_objetosPM'), habilidadesPM: val('f_habilidadesPM'), objetivoAprendizagemPM: val('f_objetivoAprendizagemPM'),
+      metodologiaPM: val('f_metodologiaPM'), recursosPM: val('f_recursosPM'),
+      datasAvalPM: val('f_datasAvalPM'), recuperacaoPM: val('f_recuperacaoPM'), adaptacoesPM: val('f_adaptacoesPM'),
+      // Comuns às duas modalidades
+      avaliacao: checkedList('aval'), avalOutros: val('f_avalOutros'),
       referencias: val('f_referencias'), localCidade: val('f_localCidade'), dataDoc: val('f_dataDoc')
     };
     if(!obj.curso && !obj.componente){ toast('Curso e componente não foram preenchidos — salvando mesmo assim.', 'warn'); }
@@ -2226,12 +2232,6 @@ function attachHandlers(){
   on('suporte-voltar', ()=>{ suporteAba='lista'; suporteChamadoAtualId=null; render(); carregarSuporte(); });
   on('suporte-abrir', async (el)=>{ suporteAba='detalhe'; suporteChamadoAtualId=el.dataset.id; render(); await carregarSuporte(); });
 
-  on('suporte-filtro', (el)=>{
-    suporteFiltroStatus = el.dataset.filtro;
-    const cont = document.getElementById('suporteConteudo');
-    if(cont){ cont.innerHTML = renderSuporteListaHtml(); attachHandlers(); }
-  });
-
   on('suporte-selecionar', (el)=>{
     const id = el.dataset.id;
     if(el.checked) suporteSelecionados.add(id); else suporteSelecionados.delete(id);
@@ -2255,37 +2255,6 @@ function attachHandlers(){
     suporteSelecionados.clear();
     toast(selecionados.length + ' chamado(s) encaminhado(s) para desenvolvimento.');
     await carregarSuporte();
-  });
-
-  on('suporte-iniciar-analise', async (el)=>{
-    const c = suporteCacheChamados.find(x=>x.id===el.dataset.id); if(!c) return;
-    const agora = Date.now();
-    const patch = {
-      status: 'Em análise',
-      mensagens: [...(c.mensagens||[]), { autor:'sistema', autorNome:'Sistema', texto:'Chamado em análise pelo administrador.', criadoEm: agora }]
-    };
-    try{
-      await window.__fbUpdateChamado(c.id, patch);
-      Object.assign(c, patch);
-      render(); await carregarSuporte();
-      toast('Chamado marcado como Em análise.');
-    }catch(e){ console.error(e); toast('Não foi possível atualizar agora.', 'warn'); }
-  });
-
-  on('suporte-encaminhar-dev', async (el)=>{
-    const c = suporteCacheChamados.find(x=>x.id===el.dataset.id); if(!c) return;
-    abrirRelatorioSuporte([c]);
-    const agora = Date.now();
-    const patch = {
-      status: 'Encaminhado para desenvolvimento',
-      mensagens: [...(c.mensagens||[]), { autor:'sistema', autorNome:'Sistema', texto:'Sua solicitação foi encaminhada e encontra-se em análise.', criadoEm: agora }]
-    };
-    try{
-      await window.__fbUpdateChamado(c.id, patch);
-      Object.assign(c, patch);
-      render(); await carregarSuporte();
-      toast('Chamado encaminhado para desenvolvimento.');
-    }catch(e){ console.error(e); toast('Não foi possível atualizar agora.', 'warn'); }
   });
 
   on('suporte-aprovar-dev', async (el)=>{
@@ -2441,56 +2410,85 @@ function openPrintEscola(id){
 
 function openPrintPlanej(id){
   const pl = getPlanej(id); const p = state.perfil||{};
-  const blocosRows = (pl.blocos||[]).map(b=>`
-    <tr>
-      <td>${esc(b.titulo)}</td>
-      <td>${esc(b.habilidades)}</td>
-      <td>${esc(b.objeto)}</td>
-      <td style="text-align:center;">${b.trimestre==='1º'?'X':''}</td>
-      <td style="text-align:center;">${b.trimestre==='2º'?'X':''}</td>
-      <td style="text-align:center;">${b.trimestre==='3º'?'X':''}</td>
-    </tr>
-  `).join('') || `<tr><td colspan="6">Nenhum bloco cadastrado</td></tr>`;
   document.getElementById('printLabel').textContent = 'Planejamento — ' + (pl.curso||'');
   currentPrintFilename = ['Plan', getCursoSigla(pl.curso), getDisciplinaSigla(pl.componente), safeSeg(pl.tipo)||'Doc'].join('_') + '.pdf';
-  document.getElementById('printArea').innerHTML = `
-    ${schoolHeaderHtml(pl.escola)}
-    <div class="doctitle">PLANEJAMENTO ${esc((pl.tipo||'').toUpperCase())} — ${esc(pl.anoLetivo||'')} · ${esc(pl.modalidade||'')}</div>
-    ${pl.curso ? `<p style="text-align:center;font-weight:700;margin:-6px 0 12px 0;">CURSO: ${esc(pl.curso)}</p>` : ''}
+
+  const cabecalhoComum = `
     <table>
       <tr><td class="hdr-label">Professor(a)</td><td>${esc(pl.professor)}</td></tr>
       <tr><td class="hdr-label">Área(s) do Conhecimento</td><td>${esc(pl.area)}</td></tr>
       <tr><td class="hdr-label">Turma(s)</td><td>${esc(pl.turmas)}</td></tr>
       <tr><td class="hdr-label">Nº aulas semanais</td><td>${esc(pl.aulasSemanais)}</td></tr>
       <tr><td class="hdr-label">Componente curricular</td><td>${esc(pl.componente)}</td></tr>
-    </table>
-    <table><tr><td class="hdr-label">Objetivo geral</td><td>${esc(pl.objetivo)}</td></tr></table>
-    <table>
-      <tr><td class="hdr-label">Competências gerais BNCC</td><td>${listBlock(pl.compGerais)}</td></tr>
-      <tr><td class="hdr-label">Competências específicas</td><td>${listBlock(pl.compEspecificas)}</td></tr>
-    </table>
-    <table>
-      <thead>
+    </table>`;
+
+  let corpoHtml, tituloHtml;
+
+  if(pl.modalidade === 'EMIEP'){
+    const blocosRows = (pl.blocos||[]).map(b=>`
       <tr>
-        <th rowspan="2">Conceitos estruturantes da área</th>
-        <th rowspan="2">Habilidades</th>
-        <th rowspan="2">Objeto de conhecimento</th>
-        <th colspan="3">Trimestre</th>
+        <td>${esc(b.titulo)}</td>
+        <td>${esc(b.habilidades)}</td>
+        <td>${esc(b.objeto)}</td>
+        <td style="text-align:center;">${b.trimestre==='1º'?'X':''}</td>
+        <td style="text-align:center;">${b.trimestre==='2º'?'X':''}</td>
+        <td style="text-align:center;">${b.trimestre==='3º'?'X':''}</td>
       </tr>
-      <tr><th style="width:34px;">1º</th><th style="width:34px;">2º</th><th style="width:34px;">3º</th></tr>
-      </thead>
-      <tbody>
-      ${blocosRows}
-      </tbody>
-    </table>
-    <table>
-      <tr><td class="hdr-label">Articulação / adaptações</td><td>${esc(pl.articulacao)}</td></tr>
-      <tr><td class="hdr-label">Projetos integradores</td><td>${esc(pl.projetos)}</td></tr>
-      <tr><td class="hdr-label">Metodologia</td><td>${listBlock(pl.metodologia)}</td></tr>
-      <tr><td class="hdr-label">Observações gerais</td><td>${esc(pl.observacoes)}</td></tr>
-      <tr><td class="hdr-label">Avaliação</td><td>${(pl.avaliacao||[]).join(', ')}${pl.avalOutros? ('; '+esc(pl.avalOutros)) : ''}</td></tr>
-      <tr><td class="hdr-label">Referências bibliográficas</td><td>${listBlock(pl.referencias)}</td></tr>
-    </table>
+    `).join('') || `<tr><td colspan="6">Nenhum bloco cadastrado</td></tr>`;
+    tituloHtml = `<div class="doctitle">PLANEJAMENTO ANUAL — ${esc(pl.anoLetivo||'')} · EMIEP</div>`;
+    corpoHtml = `
+      <table><tr><td class="hdr-label">Objetivo geral</td><td>${esc(pl.objetivo)}</td></tr></table>
+      <table>
+        <tr><td class="hdr-label">Competências gerais BNCC</td><td>${listBlock(pl.compGerais)}</td></tr>
+        <tr><td class="hdr-label">Competências específicas</td><td>${listBlock(pl.compEspecificas)}</td></tr>
+      </table>
+      <table>
+        <thead>
+        <tr>
+          <th rowspan="2">Conceitos estruturantes da área</th>
+          <th rowspan="2">Habilidades</th>
+          <th rowspan="2">Objeto de conhecimento</th>
+          <th colspan="3">Trimestre</th>
+        </tr>
+        <tr><th style="width:34px;">1º</th><th style="width:34px;">2º</th><th style="width:34px;">3º</th></tr>
+        </thead>
+        <tbody>
+        ${blocosRows}
+        </tbody>
+      </table>
+      <table>
+        <tr><td class="hdr-label">Articulação / adaptações</td><td>${esc(pl.articulacao)}</td></tr>
+        <tr><td class="hdr-label">Projetos integradores</td><td>${esc(pl.projetos)}</td></tr>
+        <tr><td class="hdr-label">Metodologia</td><td>${listBlock(pl.metodologia)}</td></tr>
+        <tr><td class="hdr-label">Observações gerais</td><td>${esc(pl.observacoes)}</td></tr>
+        <tr><td class="hdr-label">Avaliação</td><td>${(pl.avaliacao||[]).join(', ')}${pl.avalOutros? ('; '+esc(pl.avalOutros)) : ''}</td></tr>
+        <tr><td class="hdr-label">Referências bibliográficas</td><td>${listBlock(pl.referencias)}</td></tr>
+      </table>`;
+  } else {
+    // Pós-Médio — modelo Semestral, sem BNCC, sem tabela por trimestre.
+    tituloHtml = `<div class="doctitle">PLANEJAMENTO SEMESTRAL — ${esc(pl.anoLetivo||'')} · PÓS-MÉDIO</div>`;
+    corpoHtml = `
+      <table>
+        <tr><td class="hdr-label">Objetos de conhecimento</td><td>${esc(pl.objetosPM)}</td></tr>
+        <tr><td class="hdr-label">Habilidades</td><td>${listBlock(pl.habilidadesPM)}</td></tr>
+        <tr><td class="hdr-label">Objetivo de aprendizagem</td><td>${esc(pl.objetivoAprendizagemPM)}</td></tr>
+        <tr><td class="hdr-label">Metodologia de ensino-aprendizagem</td><td>${listBlock(pl.metodologiaPM)}</td></tr>
+        <tr><td class="hdr-label">Recursos utilizados</td><td>${listBlock(pl.recursosPM)}</td></tr>
+        <tr><td class="hdr-label">Instrumentos diversificados de avaliação</td><td>${(pl.avaliacao||[]).join(', ')}${pl.avalOutros? ('; '+esc(pl.avalOutros)) : ''}</td></tr>
+        <tr><td class="hdr-label">Datas previstas de avaliações e recuperações</td><td>${esc(pl.datasAvalPM)}</td></tr>
+        <tr><td class="hdr-label">Recuperação paralela de aprendizagem</td><td>${esc(pl.recuperacaoPM)}</td></tr>
+        <tr><td class="hdr-label">Adaptações e observações</td><td>${esc(pl.adaptacoesPM)}</td></tr>
+        <tr><td class="hdr-label">Referências bibliográficas</td><td>${listBlock(pl.referencias)}</td></tr>
+      </table>`;
+    // Nota: a nota da Portaria Nº 874/2025 já é exibida por closingNoteHtml() ao final do documento.
+  }
+
+  document.getElementById('printArea').innerHTML = `
+    ${schoolHeaderHtml(pl.escola)}
+    ${tituloHtml}
+    ${pl.curso ? `<p style="text-align:center;font-weight:700;margin:-6px 0 12px 0;">CURSO: ${esc(pl.curso)}</p>` : ''}
+    ${cabecalhoComum}
+    ${corpoHtml}
     <p style="text-align:right;font-size:12pt;">${(pl.localCidade || pl.dataDoc) ? `${esc(pl.localCidade||'')}${pl.localCidade&&pl.dataDoc?', ':''}${esc(formatDateLong(pl.dataDoc))}` : esc(pl.localData||'')}</p>
     ${closingNoteHtml()}
   `;
