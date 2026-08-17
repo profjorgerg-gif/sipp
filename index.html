@@ -106,12 +106,13 @@ input,textarea,select{font-family:inherit;}
   .topbar > button, .topbar > div + button{margin-top:12px;width:100%;}
   .who{text-align:left;}
   .doc-grid{grid-template-columns:1fr;}
-  .login-card{padding:28px 20px;}
-  .login-shell{flex-direction:column;border-radius:12px;min-height:0;max-width:460px;}
-  .login-side{padding:30px 26px;}
-  .login-side-art{margin:22px 0;}
-  .login-side-quote{font-size:15px;}
-  .login-form-side{padding:30px 24px;}
+  .login-topbar{padding:14px 20px;}
+  .login-wrap{padding:20px 14px;}
+  .login-shell{flex-direction:column;border-radius:12px;max-width:460px;width:100%;}
+  .login-side{padding:26px 22px;border-right:none;border-bottom:1px solid var(--border);}
+  .login-side-h1{white-space:normal !important;font-size:21px;}
+  .login-side-p{text-align:left;}
+  .login-form-side{padding:26px 22px;}
   .print-toolbar{flex-wrap:wrap;gap:8px;}
   #printArea{padding:16px 14px;overflow-x:auto;}
   #printArea .hdr-label{width:34%;}
@@ -170,31 +171,24 @@ legend{font-size:12px;font-weight:700;color:var(--ochre);padding:0 6px;}
 
 /* ---------- Login ---------- */
 #loginScreen{position:fixed;inset:0;background:linear-gradient(160deg,#152B47 0%,#1E3A5F 60%,#2A4A70 100%);
-  display:flex;align-items:stretch;justify-content:center;z-index:2000;}
-.login-shell{display:flex;width:100%;max-width:1180px;margin:auto;min-height:min(640px,92vh);box-shadow:0 30px 80px rgba(0,0,0,.35);border-radius:16px;overflow:hidden;}
-.login-side{flex:1 1 50%;background:linear-gradient(165deg,#152B47 0%,#1E3A5F 55%,#2A4A70 100%);color:#EAF0F6;
-  padding:52px 48px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;}
-.login-side::before{content:"";position:absolute;right:-90px;top:-90px;width:260px;height:260px;border-radius:50%;background:rgba(184,114,46,.14);}
-.login-side::after{content:"";position:absolute;left:-70px;bottom:-70px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.05);}
-.login-side-top{position:relative;z-index:1;}
-.login-side-brand{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-size:26px;font-weight:700;color:#fff;}
-.login-side-brand .mark{width:34px;height:34px;border-radius:9px;background:var(--ochre);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:17px;color:#fff;flex:none;}
-.login-side-tagline{font-size:15.5px;color:#C7D4E0;margin-top:10px;max-width:360px;line-height:1.5;}
-.login-side-art{position:relative;z-index:1;margin:34px 0;display:flex;align-items:center;gap:14px;}
-.login-side-art .badge{width:56px;height:56px;border-radius:50%;background:rgba(184,114,46,.22);border:1px solid rgba(184,114,46,.5);display:flex;align-items:center;justify-content:center;font-size:24px;flex:none;}
-.login-side-art .lines{flex:1;}
-.login-side-art .lines .bar{height:6px;border-radius:4px;background:rgba(255,255,255,.16);margin-bottom:7px;}
-.login-side-art .lines .bar:nth-child(1){width:92%;}
-.login-side-art .lines .bar:nth-child(2){width:68%;}
-.login-side-art .lines .bar:nth-child(3){width:78%;}
-.login-side-quote{position:relative;z-index:1;font-family:var(--serif);font-size:17px;line-height:1.5;color:#fff;font-style:italic;border-left:3px solid var(--ochre-light);padding-left:16px;}
-.login-side-foot{position:relative;z-index:1;font-size:12px;color:#9FB2C4;margin-top:28px;line-height:1.5;}
-.login-form-side{flex:1 1 50%;background:#fff;display:flex;align-items:center;justify-content:center;padding:40px 32px;}
-.login-card{max-width:400px;width:100%;text-align:left;}
-.login-brand{font-family:var(--serif);font-size:26px;font-weight:700;color:var(--navy-dark);}
-.login-sub{font-size:13px;color:var(--muted);margin:4px 0 28px 0;}
+  display:flex;flex-direction:column;z-index:2000;overflow-y:auto;}
+.login-topbar{background:var(--navy-dark);padding:16px 40px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.08);flex:none;}
+.login-topbar .mark{width:28px;height:28px;border-radius:7px;background:var(--ochre);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:14px;color:#fff;flex:none;}
+.login-topbar .tbtitle{font-family:var(--serif);font-size:18px;font-weight:700;color:#fff;}
+.login-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px;}
+.login-shell{background:#fff;border-radius:14px;max-width:900px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.35);display:flex;overflow:hidden;}
+.login-side{flex:1.35;padding:44px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;}
+.login-side-h1{font-family:var(--serif);font-size:24px;color:var(--navy-dark);margin-bottom:8px;white-space:nowrap;}
+.login-side-p{font-size:13.5px;color:var(--muted);line-height:1.6;margin-bottom:24px;text-align:justify;}
+.login-side-stats{display:flex;gap:20px;}
+.login-side-stats .statitem .n{font-family:var(--serif);font-size:22px;color:var(--ochre);font-weight:700;}
+.login-side-stats .statitem .l{font-size:11px;color:var(--muted);}
+.login-form-side{flex:1;padding:44px;display:flex;flex-direction:column;justify-content:center;}
+.login-card{max-width:380px;width:100%;text-align:left;}
+.login-brand{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--navy-dark);}
+.login-sub{font-size:13px;color:var(--muted);margin:4px 0 24px 0;}
 .google-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
-  border:1px solid var(--border);background:#fff;border-radius:8px;padding:11px 14px;margin-bottom:12px;
+  border:1px solid var(--border);background:#fff;border-radius:8px;padding:12px 14px;margin-bottom:12px;
   font-size:14px;font-weight:600;color:#3c4043;cursor:pointer;transition:box-shadow .15s ease,border-color .15s ease;}
 .google-btn:hover{box-shadow:0 2px 8px rgba(0,0,0,.12);border-color:#c7cbd1;}
 .google-btn .role-label{display:block;text-align:left;}
@@ -202,7 +196,7 @@ legend{font-size:12px;font-weight:700;color:var(--ochre);padding:0 6px;}
 .gicon{width:20px;height:20px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
   background:conic-gradient(from 0deg,#4285F4 0deg 90deg,#34A853 90deg 180deg,#FBBC05 180deg 270deg,#EA4335 270deg 360deg);
   color:#fff;font-family:var(--serif);font-weight:700;font-size:11px;}
-.login-note{font-size:11px;color:var(--muted);margin-top:18px;line-height:1.5;border-top:1px solid var(--border);padding-top:14px;}
+.login-note{font-size:11px;color:var(--muted);margin-top:18px;line-height:1.5;}
 #app{display:none;}
 #app.show{display:flex;}
 
@@ -348,31 +342,30 @@ legend{font-size:12px;font-weight:700;color:var(--ochre);padding:0 6px;}
 </head>
 <body>
 <div id="loginScreen">
-  <div class="login-shell">
-    <div class="login-side">
-      <div class="login-side-top">
-        <div class="login-side-brand"><span class="mark">S</span> SIPP</div>
-        <div class="login-side-tagline">Sistema Integrado de Planejamento Pedagógico</div>
+  <div class="login-topbar"><span class="mark">S</span><span class="tbtitle">SIPP</span></div>
+  <div class="login-wrap">
+    <div class="login-shell">
+      <div class="login-side">
+        <div class="login-side-h1">Planejamento pedagógico, num só lugar</div>
+        <div class="login-side-p">Organize planejamentos, sequências didáticas e documentos da sua escola com um sistema pensado para o dia a dia do professor.</div>
+        <div class="login-side-stats">
+          <div class="statitem"><div class="n">EMIEP</div><div class="l">Anual · trimestral</div></div>
+          <div class="statitem"><div class="n">Pós-Médio</div><div class="l">Semestral</div></div>
+        </div>
       </div>
-      <div class="login-side-art">
-        <div class="badge">📘</div>
-        <div class="lines"><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>
-      </div>
-      <div class="login-side-quote">"Do planejamento anual às sequências de sala de aula — tudo organizado num só lugar."</div>
-      <div class="login-side-foot">Planejamentos, Sequências Didáticas, Documentos e Suporte, integrados por professor e por escola.</div>
-    </div>
-    <div class="login-form-side">
-      <div class="login-card">
-        <div class="login-brand">Entrar no sistema</div>
-        <div class="login-sub">Entre com sua Conta Google para acessar o SIPP.</div>
-        <button class="google-btn" id="btnGoogleLogin">
-          <span class="gicon">G</span>
-          <span>
-            <span class="role-label">Entrar com o Google</span>
-            <span class="role-sub">Sua conta define automaticamente seu perfil de acesso</span>
-          </span>
-        </button>
-        <div class="login-note" id="loginStatusNote">Login real com sua Conta Google. Seus dados ficam salvos e isolados por conta.</div>
+      <div class="login-form-side">
+        <div class="login-card">
+          <div class="login-brand">Entrar no sistema</div>
+          <div class="login-sub">Entre com sua Conta Google para acessar o SIPP.</div>
+          <button class="google-btn" id="btnGoogleLogin">
+            <span class="gicon">G</span>
+            <span>
+              <span class="role-label">Entrar com o Google</span>
+              <span class="role-sub">Sua conta define automaticamente seu perfil de acesso</span>
+            </span>
+          </button>
+          <div class="login-note" id="loginStatusNote">Login real com sua Conta Google. Seus dados ficam salvos e isolados por conta.</div>
+        </div>
       </div>
     </div>
   </div>
