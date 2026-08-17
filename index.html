@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<<<<<<< HEAD
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -108,6 +107,11 @@ input,textarea,select{font-family:inherit;}
   .who{text-align:left;}
   .doc-grid{grid-template-columns:1fr;}
   .login-card{padding:28px 20px;}
+  .login-shell{flex-direction:column;border-radius:12px;min-height:0;max-width:460px;}
+  .login-side{padding:30px 26px;}
+  .login-side-art{margin:22px 0;}
+  .login-side-quote{font-size:15px;}
+  .login-form-side{padding:30px 24px;}
   .print-toolbar{flex-wrap:wrap;gap:8px;}
   #printArea{padding:16px 14px;overflow-x:auto;}
   #printArea .hdr-label{width:34%;}
@@ -166,9 +170,28 @@ legend{font-size:12px;font-weight:700;color:var(--ochre);padding:0 6px;}
 
 /* ---------- Login ---------- */
 #loginScreen{position:fixed;inset:0;background:linear-gradient(160deg,#152B47 0%,#1E3A5F 60%,#2A4A70 100%);
-  display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;}
-.login-card{background:#fff;border-radius:14px;max-width:420px;width:100%;padding:38px 34px;box-shadow:0 20px 60px rgba(0,0,0,.35);text-align:center;}
-.login-brand{font-family:var(--serif);font-size:30px;font-weight:700;color:var(--navy-dark);}
+  display:flex;align-items:stretch;justify-content:center;z-index:2000;}
+.login-shell{display:flex;width:100%;max-width:1180px;margin:auto;min-height:min(640px,92vh);box-shadow:0 30px 80px rgba(0,0,0,.35);border-radius:16px;overflow:hidden;}
+.login-side{flex:1 1 50%;background:linear-gradient(165deg,#152B47 0%,#1E3A5F 55%,#2A4A70 100%);color:#EAF0F6;
+  padding:52px 48px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;}
+.login-side::before{content:"";position:absolute;right:-90px;top:-90px;width:260px;height:260px;border-radius:50%;background:rgba(184,114,46,.14);}
+.login-side::after{content:"";position:absolute;left:-70px;bottom:-70px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.05);}
+.login-side-top{position:relative;z-index:1;}
+.login-side-brand{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-size:26px;font-weight:700;color:#fff;}
+.login-side-brand .mark{width:34px;height:34px;border-radius:9px;background:var(--ochre);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:17px;color:#fff;flex:none;}
+.login-side-tagline{font-size:15.5px;color:#C7D4E0;margin-top:10px;max-width:360px;line-height:1.5;}
+.login-side-art{position:relative;z-index:1;margin:34px 0;display:flex;align-items:center;gap:14px;}
+.login-side-art .badge{width:56px;height:56px;border-radius:50%;background:rgba(184,114,46,.22);border:1px solid rgba(184,114,46,.5);display:flex;align-items:center;justify-content:center;font-size:24px;flex:none;}
+.login-side-art .lines{flex:1;}
+.login-side-art .lines .bar{height:6px;border-radius:4px;background:rgba(255,255,255,.16);margin-bottom:7px;}
+.login-side-art .lines .bar:nth-child(1){width:92%;}
+.login-side-art .lines .bar:nth-child(2){width:68%;}
+.login-side-art .lines .bar:nth-child(3){width:78%;}
+.login-side-quote{position:relative;z-index:1;font-family:var(--serif);font-size:17px;line-height:1.5;color:#fff;font-style:italic;border-left:3px solid var(--ochre-light);padding-left:16px;}
+.login-side-foot{position:relative;z-index:1;font-size:12px;color:#9FB2C4;margin-top:28px;line-height:1.5;}
+.login-form-side{flex:1 1 50%;background:#fff;display:flex;align-items:center;justify-content:center;padding:40px 32px;}
+.login-card{max-width:400px;width:100%;text-align:left;}
+.login-brand{font-family:var(--serif);font-size:26px;font-weight:700;color:var(--navy-dark);}
 .login-sub{font-size:13px;color:var(--muted);margin:4px 0 28px 0;}
 .google-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
   border:1px solid var(--border);background:#fff;border-radius:8px;padding:11px 14px;margin-bottom:12px;
@@ -325,17 +348,33 @@ legend{font-size:12px;font-weight:700;color:var(--ochre);padding:0 6px;}
 </head>
 <body>
 <div id="loginScreen">
-  <div class="login-card">
-    <div class="login-brand">SIPP</div>
-    <div class="login-sub">Sistema Integrado de Planejamento Pedagógico</div>
-    <button class="google-btn" id="btnGoogleLogin">
-      <span class="gicon">G</span>
-      <span>
-        <span class="role-label">Entrar com o Google</span>
-        <span class="role-sub">Sua conta define automaticamente seu perfil de acesso</span>
-      </span>
-    </button>
-    <div class="login-note" id="loginStatusNote">Login real com sua Conta Google. Seus dados ficam salvos e isolados por conta.</div>
+  <div class="login-shell">
+    <div class="login-side">
+      <div class="login-side-top">
+        <div class="login-side-brand"><span class="mark">S</span> SIPP</div>
+        <div class="login-side-tagline">Sistema Integrado de Planejamento Pedagógico</div>
+      </div>
+      <div class="login-side-art">
+        <div class="badge">📘</div>
+        <div class="lines"><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>
+      </div>
+      <div class="login-side-quote">"Do planejamento anual às sequências de sala de aula — tudo organizado num só lugar."</div>
+      <div class="login-side-foot">Planejamentos, Sequências Didáticas, Documentos e Suporte, integrados por professor e por escola.</div>
+    </div>
+    <div class="login-form-side">
+      <div class="login-card">
+        <div class="login-brand">Entrar no sistema</div>
+        <div class="login-sub">Entre com sua Conta Google para acessar o SIPP.</div>
+        <button class="google-btn" id="btnGoogleLogin">
+          <span class="gicon">G</span>
+          <span>
+            <span class="role-label">Entrar com o Google</span>
+            <span class="role-sub">Sua conta define automaticamente seu perfil de acesso</span>
+          </span>
+        </button>
+        <div class="login-note" id="loginStatusNote">Login real com sua Conta Google. Seus dados ficam salvos e isolados por conta.</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2831,15 +2870,4 @@ document.getElementById('btnBackupNaoSair').addEventListener('click', async ()=>
 });
 </script>
 </body>
-=======
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SICAA — Sistema Inteligente de Correção de Atividades Avaliativas</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
->>>>>>> cb5ea38ea55510f26261a0e0bc163e8bcd0c43b8
 </html>
