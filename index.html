@@ -100,6 +100,7 @@ input,textarea,select{font-family:inherit;}
 
   /* qualquer grid de colunas fixas (filtros, formulários, avaliação) vira 1 coluna */
   .grid2,.grid3,[style*="grid-template-columns"]{grid-template-columns:1fr !important;}
+  .grid2 [style*="grid-column"],.grid3 [style*="grid-column"]{grid-column:auto !important;}
   .checklist{grid-template-columns:1fr 1fr !important;}
 
   .topbar{flex-direction:column;align-items:stretch;}
@@ -338,6 +339,16 @@ legend{font-size:12px;font-weight:700;color:var(--ochre);padding:0 6px;}
   window.__fbUpdateChamado = async function(chamadoId, patch){
     await updateDoc(doc(db, 'chamados', chamadoId), patch);
   };
+
+  // Catálogo padrão de Cursos/Disciplinas: documento único compartilhado, gerido pelo Administrador,
+  // lido por todos os usuários autenticados (regra: read=isSignedIn(), write=isAdmin()).
+  window.__fbGetCatalogo = async function(){
+    const snap = await getDoc(doc(db, 'catalogo', 'padrao'));
+    return snap.exists() ? snap.data() : { cursos: [], disciplinas: [] };
+  };
+  window.__fbSaveCatalogo = async function(dados){
+    await setDoc(doc(db, 'catalogo', 'padrao'), dados, { merge:true });
+  };
 </script>
 </head>
 <body>
@@ -390,6 +401,7 @@ legend{font-size:12px;font-weight:700;color:var(--ochre);padding:0 6px;}
       <div class="nav-item sub" data-view="cursos"><span class="nav-icon">·</span><span class="label">Cursos</span></div>
       <div class="nav-item sub" data-view="turmas"><span class="nav-icon">·</span><span class="label">Turmas</span></div>
       <div class="nav-item sub" data-view="disciplinas"><span class="nav-icon">·</span><span class="label">Disciplinas</span></div>
+      <div class="nav-item sub admin-only" data-view="catalogo" style="display:none;"><span class="nav-icon">·</span><span class="label">Catálogo padrão</span></div>
     </div>
     <div class="nav-item" data-view="planejamentos"><span class="nav-icon">◆</span><span class="label">Planejamentos</span></div>
     <div class="nav-item" data-view="sequencias"><span class="nav-icon">◆</span><span class="label">Sequências didáticas</span></div>
@@ -518,6 +530,8 @@ const DOCS_ASSETS = {
 let state = { perfil:null, escolas:[], cursos:[], turmas:[], disciplinas:[], planejamentos:[], sequencias:[], pesquisaRespondida:false, lastSeenVersion:null };
 let view = 'inicio';
 let currentRole = null; // 'professor' | 'admin' — definido pela lista de admins no Firestore
+let catalogo = { cursos: [], disciplinas: [] }; // catálogo padrão, gerido pelo Administrador
+let editingCatalogoCursoId = null, editingCatalogoDisciplinaId = null;
 let currentUid = null;
 let currentEmail = null;
 let currentNome = null;
@@ -697,6 +711,7 @@ function render(){
   else if(view==='cursos') m.innerHTML = viewCursos();
   else if(view==='turmas') m.innerHTML = viewTurmas();
   else if(view==='disciplinas') m.innerHTML = viewDisciplinas();
+  else if(view==='catalogo') m.innerHTML = viewCatalogo();
   else if(view==='planejamentos') m.innerHTML = editingPlanejId ? viewPlanejForm() : viewPlanejList();
   else if(view==='sequencias') m.innerHTML = editingSeqId ? viewSeqForm() : viewSeqList();
   else if(view==='documentos') m.innerHTML = viewDocumentos();
@@ -945,6 +960,11 @@ function pesquisaBaixarCsv(respostas){
 /* ============================= NOVIDADES E ATUALIZAÇÕES ============================= */
 // Lista do mais recente para o mais antigo — o primeiro item é sempre a versão vigente.
 const VERSOES = [
+  { versao:'1.8', data:'17/08/2026', itens:[
+    'Novo Catálogo padrão de Cursos e Disciplinas, gerido pelo Administrador em Cadastros → Catálogo padrão. Professores agora podem escolher rapidamente cursos e disciplinas já cadastrados pela escola, além de continuar podendo cadastrar itens próprios.',
+    'Os campos de Objetivo do Planejamento (EMIEP e Pós-Médio) agora mostram um texto de exemplo (placeholder) indicando o tipo de conteúdo esperado.',
+    'Corrigido: no celular, o campo Endereço da Escola ficava muito estreito por um problema de layout — agora ocupa a largura correta, igual aos demais campos.'
+  ]},
   { versao:'1.7', data:'17/08/2026', itens:[
     'O formulário de Planejamento agora muda conforme a Modalidade: EMIEP segue o modelo Anual com conteúdo por trimestre e competências da BNCC; Pós-Médio segue o modelo Semestral (objetos de conhecimento, metodologia, recursos, recuperação paralela), sem a tabela de trimestres.',
     'O campo "Tipo" do Planejamento passou a ser definido automaticamente pela Modalidade, evitando combinações incorretas (ex.: EMIEP marcado como Semestral).',
@@ -1450,6 +1470,16 @@ function viewEscolaForm(){
 /* ============================= CURSOS ============================= */
 function viewCursos(){
   const editing = editingCursoId ? state.cursos.find(c=>c.id===editingCursoId) : null;
+  const catalogoDisponivel = (catalogo.cursos||[]).filter(cc => !state.cursos.some(c=>c.nome===cc.nome));
+  const catalogoPickerHtml = (!editing && catalogoDisponivel.length) ? `
+    <div class="field" style="margin-bottom:16px;">
+      <label>Escolher do catálogo padrão da escola</label>
+      <select id="c_catalogoPick">
+        <option value="">— selecione para preencher automaticamente —</option>
+        ${catalogoDisponivel.map(cc => `<option value="${esc(cc.nome)}" data-sigla="${esc(cc.sigla||'')}" data-modalidade="${esc(cc.modalidade||'')}">${esc(cc.nome)}${cc.modalidade?' ('+esc(cc.modalidade)+')':''}</option>`).join('')}
+      </select>
+      <div class="hint">Lista mantida pelo Administrador. Se o curso que você precisa não estiver aqui, cadastre-o manualmente abaixo.</div>
+    </div>` : '';
   const rows = state.cursos.map(c=>`
     <div class="doc-card">
       <div class="doc-title">${esc(c.nome)}</div>
@@ -1466,6 +1496,7 @@ function viewCursos(){
     </div></div>
     <div class="card">
       <h3>${editing ? 'Editar curso' : 'Novo curso'}</h3>
+      ${catalogoPickerHtml}
       <div class="grid2">
         <div class="field"><label>Nome do curso</label><input id="c_nome" type="text" placeholder="Ex.: Técnico em Administração" value="${esc(editing?editing.nome:'')}"></div>
         <div class="field"><label>Sigla / abreviação (opcional)</label><input id="c_sigla" type="text" placeholder="Ex.: ADMEM" value="${esc(editing?editing.sigla||'':'')}"><div class="hint">Se deixar em branco, o sistema gera uma automaticamente para nomear os PDFs.</div></div>
@@ -1534,6 +1565,16 @@ function viewDisciplinas(){
         <button class="btn small danger" data-action="del-disciplina" data-id="${d.id}">Excluir</button>
       </div>
     </div>`).join('');
+  const catalogoDisponivel = (catalogo.disciplinas||[]).filter(cd => !state.disciplinas.some(d=>d.nome===cd.nome));
+  const catalogoPickerHtml = (!editing && catalogoDisponivel.length) ? `
+    <div class="field" style="margin-bottom:16px;">
+      <label>Escolher do catálogo padrão da escola</label>
+      <select id="d_catalogoPick">
+        <option value="">— selecione para preencher automaticamente —</option>
+        ${catalogoDisponivel.map(cd => `<option value="${esc(cd.nome)}" data-sigla="${esc(cd.sigla||'')}">${esc(cd.nome)}</option>`).join('')}
+      </select>
+      <div class="hint">Lista mantida pelo Administrador. Se a disciplina que você precisa não estiver aqui, cadastre-a manualmente abaixo.</div>
+    </div>` : '';
   return `
     <div class="topbar"><div>
       <h1 class="page-title">Cadastros · Disciplinas</h1>
@@ -1541,6 +1582,7 @@ function viewDisciplinas(){
     </div></div>
     <div class="card">
       <h3>${editing ? 'Editar disciplina' : 'Nova disciplina'}</h3>
+      ${catalogoPickerHtml}
       <div class="grid2">
         <div class="field"><label>Nome da disciplina</label><input id="d_nome" type="text" placeholder="Ex.: Gestão de Pessoas" value="${esc(editing?editing.nome:'')}"></div>
         <div class="field"><label>Sigla / abreviação (opcional)</label><input id="d_sigla" type="text" placeholder="Ex.: GP" value="${esc(editing?editing.sigla||'':'')}"><div class="hint">Se deixar em branco, o sistema gera uma automaticamente para nomear os PDFs.</div></div>
@@ -1551,6 +1593,70 @@ function viewDisciplinas(){
       ` : `<button class="btn" data-action="add-disciplina">Adicionar disciplina</button>`}
     </div>
     ${state.disciplinas.length? `<div class="doc-grid">${rows}</div>` : `<div class="empty">Nenhuma disciplina cadastrada ainda. <b>Cadastre a primeira acima.</b></div>`}
+  `;
+}
+
+/* ============================= CATÁLOGO PADRÃO (ADMIN) ============================= */
+function viewCatalogo(){
+  if(currentRole!=='admin'){
+    return `<div class="topbar"><div><h1 class="page-title">Catálogo padrão</h1></div></div><div class="empty">Esta área é exclusiva do Administrador.</div>`;
+  }
+  const editC = editingCatalogoCursoId ? catalogo.cursos.find(c=>c.id===editingCatalogoCursoId) : null;
+  const editD = editingCatalogoDisciplinaId ? catalogo.disciplinas.find(d=>d.id===editingCatalogoDisciplinaId) : null;
+  const cursoRows = (catalogo.cursos||[]).map(c=>`
+    <div class="doc-card">
+      <div class="doc-title">${esc(c.nome)}</div>
+      <div class="doc-meta">${c.modalidade ? `Modalidade: <b>${esc(c.modalidade)}</b>` : 'Ambas / não se aplica'}${c.sigla?' · Sigla: <b>'+esc(c.sigla)+'</b>':''}</div>
+      <div class="doc-actions">
+        <button class="btn small secondary" data-action="edit-catalogo-curso" data-id="${c.id}">Editar</button>
+        <button class="btn small danger" data-action="del-catalogo-curso" data-id="${c.id}">Excluir</button>
+      </div>
+    </div>`).join('');
+  const disciplinaRows = (catalogo.disciplinas||[]).map(d=>`
+    <div class="doc-card">
+      <div class="doc-title">${esc(d.nome)}</div>
+      <div class="doc-meta">${d.sigla?'Sigla: <b>'+esc(d.sigla)+'</b>':'Sem sigla definida'}</div>
+      <div class="doc-actions">
+        <button class="btn small secondary" data-action="edit-catalogo-disciplina" data-id="${d.id}">Editar</button>
+        <button class="btn small danger" data-action="del-catalogo-disciplina" data-id="${d.id}">Excluir</button>
+      </div>
+    </div>`).join('');
+  return `
+    <div class="topbar"><div>
+      <h1 class="page-title">Catálogo padrão</h1>
+      <div class="page-sub">Cursos e disciplinas cadastrados aqui aparecem como opção de preenchimento rápido para todos os professores, na tela de Cursos e Disciplinas. Cada professor ainda pode cadastrar itens próprios além destes.</div>
+    </div></div>
+
+    <div class="card">
+      <h3>${editC ? 'Editar curso do catálogo' : 'Novo curso do catálogo'}</h3>
+      <div class="grid2">
+        <div class="field"><label>Nome do curso</label><input id="cc_nome" type="text" placeholder="Ex.: Técnico em Administração" value="${esc(editC?editC.nome:'')}"></div>
+        <div class="field"><label>Sigla / abreviação (opcional)</label><input id="cc_sigla" type="text" placeholder="Ex.: ADMEM" value="${esc(editC?editC.sigla||'':'')}"></div>
+        <div class="field"><label>Modalidade</label><select id="cc_modalidade">
+          <option value="" ${!editC||!editC.modalidade?'selected':''}>Ambas / não se aplica</option>
+          <option value="Pós-Médio" ${editC&&editC.modalidade==='Pós-Médio'?'selected':''}>Pós-Médio</option>
+          <option value="EMIEP" ${editC&&editC.modalidade==='EMIEP'?'selected':''}>EMIEP</option>
+        </select></div>
+      </div>
+      ${editC ? `
+        <button class="btn" data-action="save-catalogo-curso-edit">Salvar alterações</button>
+        <button class="btn secondary" data-action="cancel-catalogo-curso-edit">Cancelar</button>
+      ` : `<button class="btn" data-action="add-catalogo-curso">Adicionar ao catálogo</button>`}
+    </div>
+    ${catalogo.cursos&&catalogo.cursos.length? `<div class="doc-grid" style="margin-bottom:22px;">${cursoRows}</div>` : `<div class="empty" style="margin-bottom:22px;">Nenhum curso no catálogo ainda.</div>`}
+
+    <div class="card">
+      <h3>${editD ? 'Editar disciplina do catálogo' : 'Nova disciplina do catálogo'}</h3>
+      <div class="grid2">
+        <div class="field"><label>Nome da disciplina</label><input id="cd_nome" type="text" placeholder="Ex.: Gestão de Pessoas" value="${esc(editD?editD.nome:'')}"></div>
+        <div class="field"><label>Sigla / abreviação (opcional)</label><input id="cd_sigla" type="text" placeholder="Ex.: GP" value="${esc(editD?editD.sigla||'':'')}"></div>
+      </div>
+      ${editD ? `
+        <button class="btn" data-action="save-catalogo-disciplina-edit">Salvar alterações</button>
+        <button class="btn secondary" data-action="cancel-catalogo-disciplina-edit">Cancelar</button>
+      ` : `<button class="btn" data-action="add-catalogo-disciplina">Adicionar ao catálogo</button>`}
+    </div>
+    ${catalogo.disciplinas&&catalogo.disciplinas.length? `<div class="doc-grid">${disciplinaRows}</div>` : `<div class="empty">Nenhuma disciplina no catálogo ainda.</div>`}
   `;
 }
 
@@ -1647,7 +1753,7 @@ function viewPlanejForm(){
     <div id="blocoModEMIEP" style="display:${modalidadeAtual==='EMIEP'?'block':'none'};">
       <div class="card">
         <h3>Objetivos e competências</h3>
-        <div class="field"><label>Objetivo geral do componente</label><textarea id="f_objetivo" rows="3">${esc(pl.objetivo||'')}</textarea></div>
+        <div class="field"><label>Objetivo geral do componente</label><textarea id="f_objetivo" rows="3" placeholder="Ex.: Desenvolver competências de gestão, comunicação e tomada de decisão aplicadas à rotina das organizações, articulando teoria e prática por meio de estudos de caso e projetos.">${esc(pl.objetivo||'')}</textarea></div>
         <div class="field"><label>Competências gerais da BNCC</label><textarea id="f_compGerais" rows="3" placeholder="Uma competência por linha">${esc(pl.compGerais||'')}</textarea><div class="hint">Uma por linha — cada linha vira um parágrafo no documento.</div></div>
         <div class="field"><label>Competências específicas da área</label><textarea id="f_compEspecificas" rows="3" placeholder="Uma competência por linha">${esc(pl.compEspecificas||'')}</textarea></div>
       </div>
@@ -1674,7 +1780,7 @@ function viewPlanejForm(){
         <div class="hint" style="margin-bottom:10px;">Modelo do Planejamento Semestral Pós-Médio — sem tabela por trimestre nem competências da BNCC, conforme o formulário oficial.</div>
         <div class="field"><label>Objetos de conhecimento</label><textarea id="f_objetosPM" rows="3">${esc(pl.objetosPM||'')}</textarea></div>
         <div class="field"><label>Habilidades</label><textarea id="f_habilidadesPM" rows="3" placeholder="Uma por linha">${esc(pl.habilidadesPM||'')}</textarea></div>
-        <div class="field"><label>Objetivo de aprendizagem</label><textarea id="f_objetivoAprendizagemPM" rows="3">${esc(pl.objetivoAprendizagemPM||'')}</textarea></div>
+        <div class="field"><label>Objetivo de aprendizagem</label><textarea id="f_objetivoAprendizagemPM" rows="3" placeholder="Ex.: Compreender os processos de recrutamento e seleção, sendo capaz de aplicar técnicas de entrevista e elaborar pareceres de triagem.">${esc(pl.objetivoAprendizagemPM||'')}</textarea></div>
       </div>
 
       <div class="card">
@@ -2031,6 +2137,15 @@ function attachHandlers(){
     await save('cursos'); render();
     toast('Curso excluído.');
   });
+  const cCatalogoPick = document.getElementById('c_catalogoPick');
+  if(cCatalogoPick){
+    cCatalogoPick.addEventListener('change', ()=>{
+      const opt = cCatalogoPick.selectedOptions[0]; if(!opt || !opt.value) return;
+      document.getElementById('c_nome').value = opt.value;
+      document.getElementById('c_sigla').value = opt.dataset.sigla || '';
+      document.getElementById('c_modalidade').value = opt.dataset.modalidade || '';
+    });
+  }
 
   on('add-turma', async ()=>{
     const nome = val('t_nome'); if(!nome){ toast('Informe a turma.', 'warn'); return; }
@@ -2072,6 +2187,61 @@ function attachHandlers(){
     state.disciplinas = state.disciplinas.filter(d=>d.id!==el.dataset.id);
     await save('disciplinas'); render();
     toast('Disciplina excluída.');
+  });
+  const dCatalogoPick = document.getElementById('d_catalogoPick');
+  if(dCatalogoPick){
+    dCatalogoPick.addEventListener('change', ()=>{
+      const opt = dCatalogoPick.selectedOptions[0]; if(!opt || !opt.value) return;
+      document.getElementById('d_nome').value = opt.value;
+      document.getElementById('d_sigla').value = opt.dataset.sigla || '';
+    });
+  }
+
+  /* -------- Catálogo padrão (admin) -------- */
+  async function saveCatalogo(){ try{ await window.__fbSaveCatalogo(catalogo); }catch(e){ toast('Falha ao salvar o catálogo. Tente novamente.', 'warn'); console.error(e); } }
+  on('add-catalogo-curso', async ()=>{
+    const nome = val('cc_nome'); if(!nome){ toast('Informe o nome do curso.', 'warn'); return; }
+    catalogo.cursos = catalogo.cursos||[];
+    catalogo.cursos.push({ id: uid(), nome, sigla: val('cc_sigla'), modalidade: val('cc_modalidade') || '' });
+    await saveCatalogo(); render();
+    toast('Curso adicionado ao catálogo.');
+  });
+  on('edit-catalogo-curso', (el)=>{ editingCatalogoCursoId = el.dataset.id; render(); });
+  on('cancel-catalogo-curso-edit', ()=>{ editingCatalogoCursoId = null; render(); });
+  on('save-catalogo-curso-edit', async ()=>{
+    const nome = val('cc_nome'); if(!nome){ toast('Informe o nome do curso.', 'warn'); return; }
+    const c = catalogo.cursos.find(c=>c.id===editingCatalogoCursoId);
+    if(c){ c.nome = nome; c.sigla = val('cc_sigla'); c.modalidade = val('cc_modalidade') || ''; await saveCatalogo(); }
+    editingCatalogoCursoId = null; render();
+    toast('Curso do catálogo atualizado.');
+  });
+  on('del-catalogo-curso', async (el)=>{
+    if(!confirmClick(el, 'Confirmar exclusão do catálogo?')) return;
+    catalogo.cursos = catalogo.cursos.filter(c=>c.id!==el.dataset.id);
+    await saveCatalogo(); render();
+    toast('Curso removido do catálogo.');
+  });
+  on('add-catalogo-disciplina', async ()=>{
+    const nome = val('cd_nome'); if(!nome){ toast('Informe o nome da disciplina.', 'warn'); return; }
+    catalogo.disciplinas = catalogo.disciplinas||[];
+    catalogo.disciplinas.push({ id: uid(), nome, sigla: val('cd_sigla') });
+    await saveCatalogo(); render();
+    toast('Disciplina adicionada ao catálogo.');
+  });
+  on('edit-catalogo-disciplina', (el)=>{ editingCatalogoDisciplinaId = el.dataset.id; render(); });
+  on('cancel-catalogo-disciplina-edit', ()=>{ editingCatalogoDisciplinaId = null; render(); });
+  on('save-catalogo-disciplina-edit', async ()=>{
+    const nome = val('cd_nome'); if(!nome){ toast('Informe o nome da disciplina.', 'warn'); return; }
+    const d = catalogo.disciplinas.find(d=>d.id===editingCatalogoDisciplinaId);
+    if(d){ d.nome = nome; d.sigla = val('cd_sigla'); await saveCatalogo(); }
+    editingCatalogoDisciplinaId = null; render();
+    toast('Disciplina do catálogo atualizada.');
+  });
+  on('del-catalogo-disciplina', async (el)=>{
+    if(!confirmClick(el, 'Confirmar exclusão do catálogo?')) return;
+    catalogo.disciplinas = catalogo.disciplinas.filter(d=>d.id!==el.dataset.id);
+    await saveCatalogo(); render();
+    toast('Disciplina removida do catálogo.');
   });
 
   on('new-planej', ()=>{ view='planejamentos'; editingPlanejId='new'; formBlocos=[]; render(); setTimeout(renderBlocosBox,0); });
@@ -2802,9 +2972,11 @@ async function startApp(){
     : '<b style="color:#fff;">Professor(a)</b>') + '<br><span style="font-weight:400;font-size:11px;">' + esc(currentEmail||'') + '</span>';
   document.getElementById('main').innerHTML = `<div style="padding:60px;text-align:center;color:var(--muted);">Carregando seus dados…</div>`;
   await loadAll();
+  try{ catalogo = await window.__fbGetCatalogo(); }catch(e){ console.error('Falha ao carregar catálogo padrão:', e); catalogo = { cursos:[], disciplinas:[] }; }
   if(!state.perfil) state.perfil = { professorNome: currentNome || '', emailProf: currentEmail || '', area: '' };
   view = 'inicio';
   document.querySelectorAll('.nav-item[data-view]').forEach(n=>n.classList.toggle('active', n.dataset.view==='inicio'));
+  document.querySelectorAll('.admin-only').forEach(n=> n.style.display = currentRole==='admin' ? '' : 'none');
   render();
   await checarNovidades(mostrarWelcomeSeNecessario);
 }
