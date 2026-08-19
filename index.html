@@ -962,6 +962,10 @@ function pesquisaBaixarCsv(respostas){
 /* ============================= NOVIDADES E ATUALIZAÇÕES ============================= */
 // Lista do mais recente para o mais antigo — o primeiro item é sempre a versão vigente.
 const VERSOES = [
+  { versao:'2.0', data:'19/08/2026', itens:[
+    'Novo menu "Tutoriais" (com aviso de "Em breve", até os vídeos ficarem prontos).',
+    'Planejamentos e Sequências Didáticas agora têm dois botões ao salvar: "Salvar como Pendente" e "Salvar como Concluído". Antes, tudo aparecia como "Pronto" mesmo quando o documento ainda estava incompleto.'
+  ]},
   { versao:'1.9', data:'19/08/2026', itens:[
     'Painel de Chamados (visão do Administrador) agora tem filtros por status: Todos, Abertos, Em análise, Encaminhado para Desenvolvimento e Encerrados, cada um com a contagem de chamados.',
     'Corrigido: o item "Catálogo padrão" no menu Cadastros ficava cortado pela metade em algumas telas.'
@@ -1725,7 +1729,7 @@ function viewPlanejList(){
   const pronto = state.perfil && state.escolas.length>0 && state.cursos.length>0;
   const cards = state.planejamentos.slice().reverse().map(pl=>`
     <div class="doc-card ${pl.tipo==='Semestral'?'tipo-semestral':''}">
-      <span class="stamp ${pl.status==='Pronto'?'pronto':'rascunho'}">${pl.status||'Rascunho'}</span>
+      <span class="stamp ${pl.status==='Pronto'?'pronto':'rascunho'}">${pl.status||'Pendente'}</span>
       <div class="doc-title">${esc(pl.curso||'Sem curso')}</div>
       <div class="doc-meta">${esc(pl.tipo)} · ${esc(pl.modalidade)} · Ano ${esc(pl.anoLetivo)}<br>Componente: ${esc(pl.componente||'—')}</div>
       <div class="doc-actions">
@@ -1857,7 +1861,8 @@ function viewPlanejForm(){
 
     <div class="formbar">
       <button class="btn secondary" data-action="cancel-planej">Cancelar</button>
-      <button class="btn" data-action="save-planej">Salvar planejamento</button>
+      <button class="btn secondary" data-action="save-planej" data-status="Pendente">Salvar como Pendente</button>
+      <button class="btn" data-action="save-planej" data-status="Pronto">Salvar como Concluído</button>
     </div>
   `;
 }
@@ -1894,7 +1899,7 @@ function viewSeqList(){
   const pronto = state.perfil && state.escolas.length>0 && state.cursos.length>0;
   const cards = state.sequencias.slice().reverse().map(sq=>`
     <div class="doc-card">
-      <span class="stamp ${sq.status==='Pronto'?'pronto':'rascunho'}">${sq.status||'Rascunho'}</span>
+      <span class="stamp ${sq.status==='Pronto'?'pronto':'rascunho'}">${sq.status||'Pendente'}</span>
       <div class="doc-title">${esc(sq.periodo||'Sequência didática')}</div>
       <div class="doc-meta">${esc(sq.componente||'—')}<br>${formatDateShort(sq.dataInicio)} a ${formatDateShort(sq.dataFim)}</div>
       <div class="doc-actions">
@@ -2002,7 +2007,8 @@ function viewSeqForm(){
 
     <div class="formbar">
       <button class="btn secondary" data-action="cancel-seq">Cancelar</button>
-      <button class="btn ochre" data-action="save-seq">Salvar sequência</button>
+      <button class="btn secondary" data-action="save-seq" data-status="Pendente">Salvar como Pendente</button>
+      <button class="btn ochre" data-action="save-seq" data-status="Pronto">Salvar como Concluído</button>
     </div>
   `;
 }
@@ -2296,7 +2302,7 @@ function attachHandlers(){
   on('rm-bloco', (el)=>{ formBlocos.splice(+el.dataset.idx,1); renderBlocosBox(); });
   on('dup-planej', async (el)=>{
     const src = getPlanej(el.dataset.id); const copy = JSON.parse(JSON.stringify(src));
-    copy.id = uid(); copy.status='Rascunho'; copy.criadoEm = Date.now();
+    copy.id = uid(); copy.status='Pendente'; copy.criadoEm = Date.now();
     state.planejamentos.push(copy); await save('planejamentos'); render();
     toast('Planejamento duplicado — edite os dados que mudaram.');
   });
@@ -2327,13 +2333,14 @@ function attachHandlers(){
     }
     editingPlanejId=null; formBlocos=[]; render();
   }
-  on('save-planej', async ()=>{
+  on('save-planej', async (btnEl)=>{
+    const statusEscolhido = btnEl.dataset.status || 'Pronto';
     const existing = editingPlanejId!=='new' ? getPlanej(editingPlanejId) : null;
     const modalidadeSalva = val('f_modalidade');
     const obj = {
       id: editingPlanejId==='new' ? uid() : editingPlanejId,
       criadoEm: existing ? (existing.criadoEm || 0) : Date.now(),
-      status: 'Pronto',
+      status: statusEscolhido,
       tipo: modalidadeSalva==='EMIEP' ? 'Anual' : 'Semestral', modalidade: modalidadeSalva, anoLetivo: val('f_ano'), escola: val('f_escola'),
       curso: val('f_curso'), turmas: getTurmasFromForm(), aulasSemanais: val('f_aulas'),
       componente: getComponenteFromForm(), professor: val('f_professor'), area: val('f_area'),
@@ -2395,7 +2402,7 @@ function attachHandlers(){
   });
   on('dup-seq', async (el)=>{
     const src = getSeq(el.dataset.id); const copy = JSON.parse(JSON.stringify(src));
-    copy.id = uid(); copy.status='Rascunho'; copy.criadoEm = Date.now();
+    copy.id = uid(); copy.status='Pendente'; copy.criadoEm = Date.now();
     state.sequencias.push(copy); await save('sequencias'); render();
     toast('Sequência duplicada — edite os dados que mudaram.');
   });
@@ -2405,12 +2412,13 @@ function attachHandlers(){
     await save('sequencias'); render();
     toast('Sequência excluída.');
   });
-  on('save-seq', async ()=>{
+  on('save-seq', async (btnEl)=>{
+    const statusEscolhido = btnEl.dataset.status || 'Pronto';
     const existingSq = editingSeqId!=='new' ? getSeq(editingSeqId) : null;
     const obj = {
       id: editingSeqId==='new' ? uid() : editingSeqId,
       criadoEm: existingSq ? (existingSq.criadoEm || 0) : Date.now(),
-      status:'Pronto', planejId: val('s_planejId')||null, escola: val('s_escola'),
+      status: statusEscolhido, planejId: val('s_planejId')||null, escola: val('s_escola'),
       periodo: val('s_periodo'), dataInicio: val('s_dataInicio'), dataFim: val('s_dataFim'),
       modalidade: val('s_modalidade'),
       curso: val('s_curso'), turmas: getTurmasFromForm('Seq'), aulasSemanais: val('s_aulas'),
