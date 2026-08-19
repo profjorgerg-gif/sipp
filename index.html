@@ -409,6 +409,7 @@ legend{font-size:12px;font-weight:700;color:var(--ochre);padding:0 6px;}
     <div class="nav-item" data-view="pesquisa"><span class="nav-icon">◆</span><span class="label">Pesquisa</span></div>
     <div class="nav-item" data-view="suporte"><span class="nav-icon">◆</span><span class="label">Suporte</span></div>
     <div class="nav-item" data-view="novidades"><span class="nav-icon">◆</span><span class="label">Novidades</span></div>
+    <div class="nav-item" data-view="tutoriais"><span class="nav-icon">◆</span><span class="label">Tutoriais</span></div>
     <div class="nav-item" data-view="backup"><span class="nav-icon">◆</span><span class="label">Backup</span></div>
     <div class="sidebar-foot">
       <div id="sessionLabel" style="margin-bottom:6px;"></div>
@@ -718,6 +719,7 @@ function render(){
   else if(view==='pesquisa') m.innerHTML = viewPesquisa();
   else if(view==='suporte') m.innerHTML = viewSuporte();
   else if(view==='novidades') m.innerHTML = viewNovidades();
+  else if(view==='tutoriais') m.innerHTML = viewTutoriais();
   else if(view==='backup') m.innerHTML = viewBackup();
   attachHandlers();
 }
@@ -1004,6 +1006,20 @@ const VERSOES = [
   ]},
 ];
 const APP_VERSION = VERSOES[0].versao;
+
+function viewTutoriais(){
+  return `
+    <div class="topbar"><div>
+      <h1 class="page-title">Tutoriais</h1>
+      <div class="page-sub">Vídeos curtos e passo a passo sobre como usar o SIPP.</div>
+    </div></div>
+    <div class="card" style="text-align:center;padding:56px 24px;">
+      <div style="font-size:34px;margin-bottom:10px;">🎬</div>
+      <h3 style="border:0;margin:0 0 6px 0;">Em breve</h3>
+      <div class="hint">Estamos preparando vídeos tutoriais com orientações objetivas sobre cadastros e principais funcionalidades do sistema.</div>
+    </div>
+  `;
+}
 
 function viewNovidades(){
   return `
